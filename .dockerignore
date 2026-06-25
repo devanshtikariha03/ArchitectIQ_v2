@@ -1,0 +1,10 @@
+node_modules/
+logs/
+.env
+*.backup.html
+ArchitectIQ_example.html
+test-harness/
+__pycache__/
+*.pyc
+*.svg
+.git/

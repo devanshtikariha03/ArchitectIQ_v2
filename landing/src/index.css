@@ -1,0 +1,271 @@
+﻿@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500;600&display=swap');
+@import "tailwindcss";
+
+:root {
+  --bg:        #F8FAFC;
+  --bg2:       #FFFFFF;
+  --surface:   #F8FAFC;
+  --border:    rgba(15,23,42,0.10);
+  --border-hi: rgba(37,99,235,0.28);
+  --text:      #020617;
+  --muted:     #334155;
+  --subtle:    #64748B;
+  --accent:    #E8472A;
+  --accent2:   #FF6B35;
+  --blue:      #4F8EFF;
+  --green:     #34D399;
+  --yellow:    #FBBF24;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: linear-gradient(180deg, #FFFFFF 0%, var(--bg) 100%);
+  color: var(--text);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+}
+
+/* -- Typography -- */
+.mono { font-family: 'JetBrains Mono', monospace; }
+
+.text-gradient {
+  background: linear-gradient(135deg, #020617 0%, #475569 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.text-accent-gradient {
+  background: linear-gradient(135deg, var(--accent) 0%, var(--accent2) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* -- Glass Card -- */
+.glass {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+}
+.glass:hover {
+  border-color: var(--border-hi);
+  background: #FFFFFF;
+}
+
+/* -- Gradient border card -- */
+.glow-border {
+  position: relative;
+  border-radius: 16px;
+  background: var(--surface);
+  border: 1px solid transparent;
+  background-clip: padding-box;
+}
+.glow-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 17px;
+  background: linear-gradient(135deg, rgba(232,71,42,0.5), rgba(79,142,255,0.3), rgba(232,71,42,0.1));
+  z-index: -1;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.glow-border:hover::before { opacity: 1; }
+
+/* -- Buttons -- */
+.btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 26px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, var(--accent), var(--accent2));
+  text-decoration: none;
+  transition: opacity 0.2s, transform 0.15s, box-shadow 0.2s;
+  box-shadow: 0 0 0 0 rgba(232,71,42,0);
+  border: none;
+  cursor: pointer;
+}
+.btn-primary:hover {
+  opacity: 0.92;
+  transform: translateY(-1px);
+  box-shadow: 0 8px 32px rgba(232,71,42,0.4), 0 0 0 1px rgba(232,71,42,0.2);
+}
+
+.btn-ghost {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 13px 26px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--muted);
+  background: transparent;
+  border: 1px solid var(--border);
+  text-decoration: none;
+  transition: color 0.2s, border-color 0.2s, transform 0.15s;
+  cursor: pointer;
+}
+.btn-ghost:hover {
+  color: white;
+  border-color: var(--border-hi);
+  transform: translateY(-1px);
+}
+
+/* -- Badge -- */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 12px;
+  border-radius: 100px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+/* -- Noise overlay -- */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
+  pointer-events: none;
+  z-index: 9999;
+  opacity: 0.5;
+}
+
+/* -- Mesh blobs -- */
+.mesh-blob {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(80px);
+  pointer-events: none;
+}
+
+/* -- Scroll reveal -- */
+.reveal {
+  opacity: 0;
+  transform: translateY(28px);
+  transition: opacity 0.65s cubic-bezier(0.16,1,0.3,1), transform 0.65s cubic-bezier(0.16,1,0.3,1);
+}
+.reveal.visible { opacity: 1; transform: translateY(0); }
+
+/* -- Pulse animation -- */
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50%       { opacity: 0.3; }
+}
+.pulse { animation: pulse 1.6s ease-in-out infinite; }
+
+/* -- Shimmer -- */
+@keyframes shimmer {
+  0%   { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+.shimmer {
+  background: linear-gradient(90deg, var(--border) 25%, rgba(255,255,255,0.12) 50%, var(--border) 75%);
+  background-size: 200% auto;
+  animation: shimmer 2.5s linear infinite;
+}
+
+/* -- Tab -- */
+.tab-btn {
+  padding: 7px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.15s;
+  background: transparent;
+  color: var(--subtle);
+}
+.tab-btn:hover { color: var(--muted); }
+.tab-btn.active {
+  background: rgba(255,255,255,0.08);
+  color: white;
+}
+
+/* -- Divider -- */
+.divider {
+  border: none;
+  height: 1px;
+  background: var(--border);
+}
+
+/* -- Section label -- */
+.section-label {
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--subtle);
+}
+
+/* -- Pipeline step line -- */
+.step-connector {
+  width: 1px;
+  flex: 1;
+  background: linear-gradient(to bottom, var(--border), transparent);
+  margin: 4px auto;
+}
+
+/* Light-mode inline color correction for the landing route. */
+main [style*="color: 'white'"],
+main [style*='color: "white"'],
+main [style*='color: white'] { color: var(--text) !important; }
+main [style*='rgba(255,255,255,0.35)'],
+main [style*='rgba(255,255,255,0.38)'],
+main [style*='rgba(255,255,255,0.4)'],
+main [style*='rgba(255,255,255,0.42)'],
+main [style*='rgba(255,255,255,0.45)'],
+main [style*='rgba(255,255,255,0.5)'] { color: var(--muted) !important; }
+.section-divider {
+  position: absolute;
+  top: 0;
+  left: 50%;
+  width: 60%;
+  height: 1px;
+  transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, rgba(15,23,42,0.12), transparent);
+}
+
+
+/* Force readable light-mode landing text. Scoped to the landing route only. */
+#root > main :is(h1,h2,h3,h4,p,span,div,li,td,th,strong) {
+  color: #0F172A !important;
+}
+
+#root > main :is(p,li,td,th) {
+  color: #334155 !important;
+}
+
+#root > main .section-label,
+#root > main [class*="mono"] {
+  color: #64748B !important;
+}
+
+#root > main .btn-primary,
+#root > main .btn-primary *,
+#root > main a.btn-primary,
+#root > main a.btn-primary * {
+  color: #FFFFFF !important;
+}
+
+#root > main [style*="WebkitTextFillColor"],
+#root > main [style*="-webkit-text-fill-color"] {
+  color: transparent !important;
+}
+

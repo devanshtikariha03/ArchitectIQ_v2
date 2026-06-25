@@ -1,0 +1,16 @@
+{
+  "playlist_id": "PLrtCHHeadkHqhuz-bwUiGbmdUnN4eonZ2",
+  "playlist": "https://youtube.com/playlist?list=PLrtCHHeadkHqhuz-bwUiGbmdUnN4eonZ2",
+  "provider": "anthropic",
+  "model": "claude-sonnet-4-6",
+  "videos_found": 20,
+  "chunks_processed": 31,
+  "failures": [],
+  "outputs": {
+    "notes": "tools\\solution_architect_intelligence\\out-anthropic\\derived_solution_architect_thinking_notes.md",
+    "prompt_fragment": "tools\\solution_architect_intelligence\\out-anthropic\\solution_architect_thinking_layer.md",
+    "merged_prompt": "tools\\solution_architect_intelligence\\out-anthropic\\architectiq_system_prompt_merged.md",
+    "checkpoint": "tools\\solution_architect_intelligence\\out-anthropic\\chunk_findings.jsonl"
+  },
+  "raw_transcripts_saved": false
+}

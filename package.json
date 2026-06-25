@@ -1,0 +1,20 @@
+{
+  "name": "architectiq",
+  "version": "1.0.0",
+  "description": "",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node test-harness/stress.js",
+    "test:llm": "node test-harness/stress-llm.js",
+    "test:all": "node test-harness/stress.js && node test-harness/stress-llm.js",
+    "test:report": "node test-harness/report.js --open"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "mermaid": "^11.13.0"
+  }
+}
