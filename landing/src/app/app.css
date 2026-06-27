@@ -2540,6 +2540,16 @@
 
 .app-root .mermaid { background: transparent; }
 .app-root .mermaid svg { max-width: 100%; }
+.app-root .diagram-svg-shell {
+  width: 100%;
+  overflow: auto;
+}
+.app-root .diagram-svg-shell svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: 100%;
+}
 
 .app-root .architecture-code-panel { }
 
@@ -2617,6 +2627,59 @@
   background: var(--blue);
   flex-shrink: 0;
   margin-top: 4px;
+}
+
+.app-root .client-ready-gate.pass {
+  border-color: rgba(52,211,153,0.28);
+}
+
+.app-root .client-ready-gate.fail {
+  border-color: rgba(248,113,113,0.28);
+}
+
+.app-root .gate-summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.app-root .gate-summary strong {
+  display: block;
+  color: var(--text);
+  font-size: 15px;
+  margin: 2px 0 4px;
+}
+
+.app-root .gate-summary p {
+  color: var(--subtle);
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.app-root .gate-score {
+  min-width: 72px;
+  text-align: center;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: .08em;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+}
+
+.app-root .gate-score.pass {
+  color: #34d399;
+  background: rgba(52,211,153,0.1);
+  border-color: rgba(52,211,153,0.25);
+}
+
+.app-root .gate-score.fail {
+  color: #f87171;
+  background: rgba(248,113,113,0.1);
+  border-color: rgba(248,113,113,0.25);
 }
 
 /* -- Log panel -- */
@@ -2760,6 +2823,91 @@
   .app-root .architecture-view-grid,
   .app-root .architecture-metrics { grid-template-columns: 1fr 1fr; }
   .app-root .btnrow { flex-direction: column; align-items: stretch; }
+}
+
+@media print {
+  body {
+    background: #fff !important;
+  }
+
+  .app-root .sidebar,
+  .app-root .topbar,
+  .app-root .out-view-bar,
+  .app-root .architecture-main-tools,
+  .app-root .architecture-toolbar,
+  .app-root .architecture-code-panel,
+  .app-root .btn,
+  .app-root .reviewer-actions,
+  .app-root .architecture-side {
+    display: none !important;
+  }
+
+  .app-root .container,
+  .app-root .shell,
+  .app-root .content {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  .app-root .card,
+  .app-root .architecture-card,
+  .app-root .validation-card,
+  .app-root .intelligence-card,
+  .app-root .contradiction-box,
+  .app-root .client-ready-gate {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #111827 !important;
+  }
+
+  .app-root .architecture-layout,
+  .app-root .architecture-stage,
+  .app-root .architecture-stage.split {
+    display: block !important;
+    overflow: visible !important;
+    border: 0 !important;
+    background: #fff !important;
+  }
+
+  .app-root .diagram-wrap,
+  .app-root .mermaid,
+  .app-root .diagram-svg-shell {
+    overflow: visible !important;
+    width: 100% !important;
+    padding: 0 !important;
+    background: #fff !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .app-root .diagram-svg-shell svg,
+  .app-root .mermaid svg {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    max-height: 7.2in !important;
+  }
+
+  .app-root .architecture-stage-top {
+    padding: 0 0 8px !important;
+    background: #fff !important;
+    border-bottom: 1px solid #d1d5db !important;
+  }
+
+  .app-root .architecture-view-grid,
+  .app-root .architecture-metrics,
+  .app-root .architecture-insight-grid {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
 }
 
 

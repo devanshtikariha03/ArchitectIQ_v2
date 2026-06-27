@@ -914,11 +914,12 @@ function evidenceRows(state,result,research,pricing,validation){
   const profile=retailWorkloadProfile(state);
   const pricingStatus=getPricingEvidenceStatus(result).label;
   const hasResidency=/region|residen|country|gdpr|ccpa|eu|australia|new zealand|us|uk/i.test(profile.text);
+  const pricingBasis=(pricing?.summary||[]).slice(0,2).join(' | ')||(pricing?.exclusions||[]).slice(0,1).join(' | ')||'No live service-level pricing available';
   return [
     {area:'Retail workload classification',status:'Derived',basis:profile.primary,action:'Confirm with client sponsor during discovery.'},
     {area:'Company profile',status:research?.research_confidence||'User-provided / low',basis:research?.company_profile||state?.basics?.company||'Not researched',action:'Validate public research and client-provided facts.'},
     {area:'Scale and peak load',status:'User-provided',basis:`${state?.scale?.usersNow||'Not stated'} -> ${state?.scale?.users12m||'Not stated'}`,action:'Validate with POS, commerce, WMS, and analytics telemetry.'},
-    {area:'Pricing',status:pricingStatus,basis:(pricing?.summary||[]).slice(0,2).join(' | ')||'No live service-level pricing available',action:'SA/FinOps review before client-ready estimate.'},
+    {area:'Pricing',status:pricingStatus,basis:pricingBasis,action:'SA/FinOps review before client-ready estimate.'},
     {area:'Compliance',status:'Inferred',basis:state?.nfr?.compliance||'Retail compliance not fully stated',action:'Security/compliance owner must confirm PCI/privacy/regional scope.'},
     {area:'Data residency',status:hasResidency?'Needs validation':'Not explicit',basis:state?.nfr?.i18n||state?.basics?.constraints||'No residency constraint stated',action:'Confirm storage, logs, backups, telemetry, support access, and SaaS metadata locations.'},
     {area:'Validation verdict',status:validation?.verdict||'Pending',basis:validation?.budget_note||'No validation note yet',action:'Human Solution Architect signs off or sends back for revision.'}
@@ -951,7 +952,7 @@ function buildRetailArchitectureReviewPack(state,result,research,pricing,validat
 
 function inferEvidenceStatus(result,research,pricing){
   const current=result?.evidence_status||{};
-  const priceStatus=(pricing?.summary||[]).some(item=>/\$|per\s|hour|request|gb|unit|million|vcpu|iops/i.test(String(item)))?'partial':'assumption';
+  const priceStatus=(pricing?.usablePricePoints||[]).length?'partial':'assumption';
   const researchStatus=research?.research_confidence==='high'?'partial':'assumption';
   return {
     pricing:current.pricing||priceStatus,
@@ -1015,7 +1016,7 @@ function defaultAssumptions(state,result,research,pricing){
   const additions=[
     `${state?.basics?.company||'The client'} scale and current-state facts are treated as client-provided until validated against POS, commerce, WMS/ERP, and analytics telemetry.`,
     `Primary workload is classified as ${profile.primary}; adjacent segments should be confirmed during discovery: ${profile.segments.join(', ')}.`,
-    pricing?.summary?.length?'Pricing is partially verified from limited provider data and still requires service-level FinOps validation.':'Pricing is an assumption until service-level cloud, SaaS, licensing, support, and implementation costs are verified.',
+    (pricing?.usablePricePoints||[]).length?'Pricing is partially verified from qualified provider datapoints and still requires service-level FinOps validation.':'Pricing is an assumption until service-level cloud, SaaS, licensing, support, and implementation costs are verified.',
     research?.research_confidence==='low'?'Public company research is low confidence; legal entity, geography, and operating footprint must be confirmed by the client.':'Company profile should still be validated with client-provided discovery evidence.'
   ];
   return [...existing,...additions].slice(0,8);
@@ -1037,7 +1038,7 @@ function defaultHumanValidation(state,result,research,pricing){
 function enrichRecommendationForReview(result,state,research,pricing){
   if(!result || typeof result!=='object') return result;
   const enriched={...result};
-  enriched.architecture_confidence=enriched.architecture_confidence||((research?.research_confidence==='high'&&pricing?.summary?.length)?'Medium':'Low');
+  enriched.architecture_confidence=enriched.architecture_confidence||((research?.research_confidence==='high'&&(pricing?.usablePricePoints||[]).length)?'Medium':'Low');
   enriched.confidence_reason=enriched.confidence_reason||'Confidence is limited until company facts, workload inventory, service-level pricing, compliance scope, residency, and operational acceptance evidence are validated.';
   enriched.evidence_status=inferEvidenceStatus(enriched,research,pricing);
   enriched.workload_pricing_assumptions=defaultWorkloadPricingAssumptions(enriched,state);
@@ -1061,7 +1062,7 @@ function architectureBoardChecks(state,result,validation){
   const hasNfrCoverage=Array.isArray(result?.nfr_coverage)&&result.nfr_coverage.length>=5;
   const hasAssumptions=Array.isArray(result?.assumptions)&&result.assumptions.length>=3;
   const hasHumanValidation=Array.isArray(result?.human_validation_needed)&&result.human_validation_needed.length>=3;
-  const diagramSummary=summarizeArchitectureDiagram(normalizeArchitectureDiagram(buildArchitectureFromRecommendation(recTier)));
+  const diagramSummary=summarizeArchitectureDiagram(buildArchitectureViews(recTier).solution.code);
   const checks=[
     {
       lens:'Business outcome',
@@ -1182,6 +1183,103 @@ function buildReviewerWorkflowCard(validation){
   const disabled=validation?.verdict==='fail'?'disabled':'';
   const helper=validation?.verdict==='fail'?'Validation failed, so approval should remain blocked until the output is revised.':'Use this as a local reviewer checkpoint before sharing or printing the recommendation.';
   return `<div class="reviewer-workflow card tech-only"><div class="card-head"><div class="card-head-dot"></div>Reviewer workflow</div><div class="reviewer-workflow-body"><div><div class="review-label">Current decision</div><strong class="reviewer-status ${cls}">${escapeHtml(label)}</strong><p>${escapeHtml(helper)}</p><p>${escapeHtml(REVIEW_DECISION.note||'Not reviewed')}</p></div><div class="reviewer-actions"><button class="btn pri" ${disabled} onclick="setReviewDecision('approved')">Approve pack</button><button class="btn" onclick="setReviewDecision('revise')">Request revision</button><button class="btn" onclick="setReviewDecision('pending')">Reset review</button></div></div></div>`;
+}
+
+function evidenceValue(result,key){
+  return String(result?.evidence_status?.[key]||'assumption').toLowerCase();
+}
+
+function buildServiceLevelPricingRows(result){
+  const assumptions=result?.workload_pricing_assumptions||{};
+  const rows=[
+    ['Request volume',assumptions.requests_per_day||'Assumption required'],
+    ['Turns per request',assumptions.turns_per_request||'Assumption required'],
+    ['Input tokens / turn',assumptions.input_tokens_per_turn||'Assumption required'],
+    ['Output tokens / turn',assumptions.output_tokens_per_turn||'Assumption required'],
+    ['Cache hit rate',assumptions.cache_hit_rate||'Assumption required'],
+    ['Model routing split',assumptions.model_routing_split||'Assumption required'],
+    ['Peak multiplier',assumptions.peak_multiplier||'Assumption required']
+  ];
+  return rows.map(([k,v])=>`<tr><td>${escapeHtml(k)}</td><td>${escapeHtml(v)}</td></tr>`).join('');
+}
+
+function clientReadyGate(state,result,validation,activeTier){
+  const blockers=[];
+  const warnings=[];
+  const board=architectureBoardChecks(state,result,validation);
+  const sorOpen=retailSystemsOfRecordRows(state,result).filter(row=>String(row.status||'').startsWith('Open'));
+  const diagramSummary=summarizeArchitectureDiagram(buildArchitectureViews(activeTier||{}).solution.code);
+  const evidence=result?.evidence_status||{};
+  const pricing=evidenceValue(result,'pricing');
+  const residency=evidenceValue(result,'data_residency');
+  const compliance=evidenceValue(result,'compliance');
+  const region=evidenceValue(result,'region_availability');
+  const pricingAssumptions=Object.values(result?.workload_pricing_assumptions||{}).join(' ').toLowerCase();
+
+  if(!validation){
+    blockers.push('Output validation has not run.');
+  }else if(validation.verdict!=='pass'){
+    blockers.push(`Output validation is ${validation.verdict}; client-ready export requires pass.`);
+  }
+  if((validation?.constraint_violations||[]).length){
+    blockers.push('Hard constraint violations remain unresolved.');
+  }
+  if(board.average<8 || board.blockers.length){
+    blockers.push(`Principal architecture board is ${board.average}/10; all board gates must be at least conditional-free before client delivery.`);
+  }
+  if(pricing!=='verified'){
+    blockers.push(`Pricing evidence is ${evidence.pricing||'assumption'}; service-by-service FinOps validation is required.`);
+  }
+  if(['assumption','unknown',''].includes(residency)){
+    blockers.push('Data residency is not verified or partially evidenced across apps, data, logs, backups, SaaS metadata, telemetry, and support access.');
+  }
+  if(['assumption','unknown',''].includes(compliance)){
+    blockers.push('Compliance evidence is not verified or partially evidenced by a security/compliance owner.');
+  }
+  if(['assumption','unknown',''].includes(region)){
+    warnings.push('Region/service availability is still assumption-level and should be confirmed before procurement.');
+  }
+  if(sorOpen.length){
+    blockers.push(`Systems of record still have open ownership: ${sorOpen.slice(0,4).map(row=>row.name).join(', ')}${sorOpen.length>4?'...':''}.`);
+  }
+  if(diagramSummary.serviceCount<10 || diagramSummary.edgeCount<9 || diagramSummary.groupCount<4){
+    blockers.push(`Primary solution diagram is too weak (${diagramSummary.serviceCount} services, ${diagramSummary.edgeCount} flows, ${diagramSummary.groupCount} groups).`);
+  }
+  if(/assumption required|not applicable unless|no model routing/.test(pricingAssumptions)&&retailWorkloadProfile(state).hasAi){
+    blockers.push('AI/model cost assumptions are incomplete for a retail AI workload.');
+  }
+  if(REVIEW_DECISION.status!=='approved'){
+    blockers.push('Human Solution Architect reviewer has not approved the pack.');
+  }
+  return {ready:blockers.length===0,blockers,warnings,board,diagramSummary};
+}
+
+function buildClientReadyGateCard(state,result,validation,activeTier){
+  const gate=clientReadyGate(state,result,validation,activeTier);
+  const status=gate.ready?'Client-ready export unlocked':'Client-ready export blocked';
+  const cls=gate.ready?'pass':'fail';
+  const blockerItems=(gate.blockers.length?gate.blockers:gate.warnings.length?gate.warnings:['No deterministic blockers found.']).slice(0,8).map(item=>`<li>${escapeHtml(item)}</li>`).join('');
+  const pricingRows=buildServiceLevelPricingRows(result);
+  return `<div class="client-ready-gate card tech-only ${cls}"><div class="card-head"><div class="card-head-dot"></div>Client-ready export gate</div><div class="gate-summary"><div><div class="review-label">Export status</div><strong>${escapeHtml(status)}</strong><p>${gate.ready?'The pack can be exported as client-ready after reviewer approval remains in place.':'The pack is usable as a review draft, but not as a final client deliverable.'}</p></div><div class="gate-score ${gate.ready?'pass':'fail'}">${gate.ready?'READY':'DRAFT'}</div></div><div class="review-section-title">${gate.ready?'Remaining notes':'Blocking evidence gaps'}</div><ul class="review-gates">${blockerItems}</ul><div class="review-section-title">Service-level pricing assumptions</div><div class="review-table-wrap"><table class="review-table"><thead><tr><th>Assumption</th><th>Value</th></tr></thead><tbody>${pricingRows}</tbody></table></div></div>`;
+}
+
+function printReviewDraft(){
+  document.body.dataset.architectiqExport='draft';
+  window.print();
+}
+
+function printClientReady(){
+  const result=window.__lastResult;
+  const activeTier=(result?.tiers||[]).find(t=>t.id===ACTIVE_TIER)||chooseDefaultTier(result?.tiers)||{};
+  const gate=clientReadyGate(S,result,LAST_VALIDATION,activeTier);
+  if(!gate.ready){
+    alert(`Client-ready export is blocked:\n\n${gate.blockers.slice(0,6).join('\n')}`);
+    logEvent('warn','export.client_ready_blocked',{blockers:gate.blockers.length});
+    return;
+  }
+  document.body.dataset.architectiqExport='client-ready';
+  window.print();
+  logEvent('info','export.client_ready_started',{company:S?.basics?.company||'ArchitectIQ'});
 }
 export function escapeHtml(value){
   return String(value ?? '')
@@ -1885,6 +1983,15 @@ function findArchitectureLayerByText(stack,patterns){
 function isAiArchitectureScenario(stack){
   const basics=(S&&S.basics)||{};
   const domain=String(basics.domain||'').toLowerCase();
+  const scenarioText=getPlaybookText(S);
+  const hasRetailProcess=hasRetailStoreEdgeSignals(scenarioText)
+    ||hasRetailCommerceSignals(scenarioText)
+    ||hasRetailSupplyChainSignals(scenarioText)
+    ||hasRetailDataSignals(scenarioText)
+    ||/payment|pci|p2pe|psp|fraud|moderni[sz]ation|migration|multi-brand|franchise|legacy|erp|esb/i.test(scenarioText);
+  if(hasRetailSignals(scenarioText)&&hasRetailProcess){
+    return false;
+  }
   const stackText=stack.map(item=>`${item.layer||''} ${item.rec||''}`).join(' ').toLowerCase();
   const problemText=`${basics.problem||''} ${basics.stack||''}`.toLowerCase();
   if(/\bai\s*&\s*agentic\b|\bai\b|\bagentic\b/.test(domain)) return true;
@@ -2384,6 +2491,7 @@ function getArchitectureFacts(result){
   return {
     company,
     isAiScenario,
+    hasRetailAiPath:retailProfile.hasAi,
     workload:retailProfile.primary,
     workloadSegments:retailProfile.segments,
     region:detectArchitectureRegion(stack),
@@ -2481,7 +2589,29 @@ function getArchitectureFacts(result){
 function buildRetailWorkloadDiagrams(facts){
   const workload=String(facts.workload||'').toLowerCase();
   if(workload.includes('digital commerce')){
-    return {
+    const aiSolutionNodes=facts.hasRetailAiPath?`
+    aiGateway["AI gateway policy trace cost controls"]
+    recommend["Recommendations and ranking"]
+    supportBot["RAG support chatbot"]
+    humanSupport["Human support escalation"]`:'';
+    const aiSolutionFlows=facts.hasRetailAiPath?`
+  storefront --> aiGateway
+  aiGateway --> recommend
+  aiGateway --> supportBot
+  supportBot --> humanSupport
+  aiGateway --> audit`:'';
+    const aiDeploymentNodes=facts.hasRetailAiPath?`
+    aiGateway["AI gateway redaction tracing spend caps"]
+    recs["Recommendation model path"]
+    chatbot["RAG chatbot support path"]
+    human["CRM human escalation"]`:'';
+    const aiDeploymentFlows=facts.hasRetailAiPath?`
+  storefront --> aiGateway
+  aiGateway --> recs
+  aiGateway --> chatbot
+  chatbot --> human
+  aiGateway --> audit`:'';
+      return {
       contextCode:`flowchart LR
   shoppers["Online shoppers"]
   merch["Merchandising team"]
@@ -2498,6 +2628,57 @@ function buildRetailWorkloadDiagrams(facts){
   checkout --> oms
   checkout --> psp
   platform --> ops`,
+      solutionCode:`flowchart TB
+  subgraph edge["Customer edge and channel reads"]
+    shoppers["Online shoppers and apps"]
+    cdn["CDN WAF bot controls"]
+    storefront["Storefront BFF browse search"]
+  end
+  subgraph commit["Revenue critical commit path"]
+    cart["Cart and session"]
+    reservation["Inventory reservation authority"]
+    checkout["Checkout order commit"]
+    payment["PSP tokenized payment orchestration"]
+    order["Order ledger OMS handoff"]
+  end
+  subgraph merchandising["Retail decision services"]
+    catalogue["Product catalogue source"]
+    search["Search and faceted read model"]
+    pricing["Price and promotion ledger"]
+    fraud["Fraud risk decision service"]
+${aiSolutionNodes}
+  end
+  subgraph data["Data audit and replay"]
+    events["Event backbone schema registry DLQ"]
+    audit["Order payment promo audit"]
+    privacy["Consent PII tokenization deletion"]
+  end
+  subgraph external["External retail systems"]
+    erp["ERP product price finance"]
+    fulfilment["OMS WMS carrier promise"]
+    psp["External PSP token vault"]
+    crm["CRM service support"]
+  end
+  shoppers --> cdn
+  cdn --> storefront
+  storefront --> search
+  storefront --> cart
+  cart --> reservation
+  reservation --> checkout
+  pricing --> checkout
+  fraud --> checkout
+  checkout --> payment
+  payment --> psp
+  checkout --> order
+  order --> fulfilment
+  catalogue --> search
+  erp --> catalogue
+  erp --> pricing
+  checkout --> events
+  events --> audit
+  checkout --> privacy
+  crm --> privacy
+${aiSolutionFlows}`,
       deploymentCode:`flowchart TB
   subgraph edge["Customer edge"]
     cdn["CDN WAF bot controls"]
@@ -2519,6 +2700,7 @@ function buildRetailWorkloadDiagrams(facts){
     erp["ERP price and product feed"]
     oms["OMS fulfilment promise"]
     loyalty["Loyalty CRM"]
+${aiDeploymentNodes}
   end
   cdn --> storefront
   storefront --> catalogue
@@ -2531,7 +2713,8 @@ function buildRetailWorkloadDiagrams(facts){
   erp --> catalogue
   checkout --> oms
   checkout --> loyalty
-  checkout --> audit`,
+  checkout --> audit
+${aiDeploymentFlows}`,
       requestFlowCode:`flowchart LR
   browse["Campaign browse spike"] --> cdn["CDN WAF cache"]
   cdn --> catalogue["Catalogue and search"]
@@ -2541,13 +2724,24 @@ function buildRetailWorkloadDiagrams(facts){
   checkout --> payment["PSP tokenisation"]
   checkout --> order["OMS order submission"]
   order --> fulfilment["Store/DC fulfilment"]
-  checkout --> audit["Order payment promotion audit"]`,
+  checkout --> audit["Order payment promotion audit"]
+  catalogue --> recommend["Optional recommendations degraded safely"]
+  recommend --> browse`,
       summary:'This commerce topology separates browse spikes from checkout, order commit, payment tokens, promotion correctness, and fulfilment promises.',
       requestSubtitle:'How campaign traffic moves from browse to checkout without breaking payment, OMS, or inventory commit paths.',
       notes:['Campaign/read traffic is separated from order and payment commit paths.','Promotion, price, payment, and fulfilment promise ownership remain visible.','Best suited for commerce peak-readiness and checkout-resilience reviews.']
     };
   }
   if(workload.includes('data')||workload.includes('loyalty')){
+    const aiDataNodes=facts.hasRetailAiPath?`
+    recPolicy["Recommendation policy controls"]
+    featureStore["Governed feature store"]
+    modelEval["Model evaluation and drift checks"]`:'';
+    const aiDataFlows=facts.hasRetailAiPath?`
+  consent --> recPolicy
+  profile --> featureStore
+  featureStore --> modelEval
+  recPolicy --> activation`:'';
     return {
       contextCode:`flowchart LR
   customers["Customers and loyalty members"]
@@ -2563,6 +2757,41 @@ function buildRetailWorkloadDiagrams(facts){
   cdp --> warehouse
   cdp --> activation
   cdp --> privacy`,
+      solutionCode:`flowchart TB
+  subgraph sources["Retail sources"]
+    pos["POS transactions"]
+    commerce["Ecommerce events orders"]
+    service["Support interactions"]
+    loyalty["Loyalty enrolment"]
+  end
+  subgraph identity["Identity consent authority"]
+    identityGraph["Identity resolution graph"]
+    consent["Consent preference region authority"]
+    privacy["DSAR deletion retention workflow"]
+  end
+  subgraph products["Customer data products"]
+    profile["Customer 360 profile"]
+    segments["Segment and eligibility store"]
+    warehouse["Analytics warehouse lineage"]
+${aiDataNodes}
+  end
+  subgraph activation["Allowed activation channels"]
+    email["Email SMS campaign"]
+    app["App push onsite"]
+    cleanroom["Partner clean room retail media"]
+  end
+  sources --> identityGraph
+  identityGraph --> consent
+  consent --> profile
+  profile --> segments
+  profile --> warehouse
+  segments --> email
+  segments --> app
+  segments --> cleanroom
+  privacy --> profile
+  privacy --> segments
+  consent --> privacy
+${aiDataFlows}`,
       deploymentCode:`flowchart TB
   subgraph ingest["Ingestion"]
     pos["POS events"]
@@ -2623,6 +2852,46 @@ function buildRetailWorkloadDiagrams(facts){
   platform --> wms
   platform --> carrier
   platform --> ops`,
+      solutionCode:`flowchart TB
+  subgraph demand["Demand and promise inputs"]
+    ecommerce["Online orders"]
+    forecast["Demand forecast"]
+    capacity["Store DC capacity"]
+    supplier["Supplier feed cadence"]
+  end
+  subgraph orchestration["Fulfilment decisioning"]
+    promise["Delivery promise service"]
+    reservation["Inventory reservation authority"]
+    freshness["FEFO freshness expiry rules"]
+    substitution["Human substitution approval queue"]
+    exceptions["Late stale feed exception queue"]
+  end
+  subgraph operations["Retail operations"]
+    wms["WMS pick waves"]
+    storePick["Store picker app"]
+    carrier["Carrier slot API"]
+    support["Ops support dashboard"]
+  end
+  subgraph evidence["Control evidence"]
+    ledger["Reservation promise ledger"]
+    audit["Substitution promise audit"]
+    replay["Replay DLQ dashboard"]
+  end
+  ecommerce --> promise
+  forecast --> promise
+  capacity --> promise
+  supplier --> exceptions
+  promise --> reservation
+  reservation --> freshness
+  freshness --> wms
+  freshness --> storePick
+  storePick --> substitution
+  substitution --> promise
+  promise --> carrier
+  reservation --> ledger
+  substitution --> audit
+  exceptions --> support
+  exceptions --> replay`,
       deploymentCode:`flowchart TB
   subgraph demand["Demand and promises"]
     orders["Online orders"]
@@ -2688,6 +2957,44 @@ function buildRetailWorkloadDiagrams(facts){
   platform --> oms
   platform --> payments
   platform --> data`,
+      solutionCode:`flowchart TB
+  subgraph legacy["Current retail estate"]
+    brandPos["Brand POS systems"]
+    erp["ERP finance product price"]
+    esb["Legacy ESB integrations"]
+    reports["Store reporting apps"]
+  end
+  subgraph foundation["Shared retail foundation"]
+    identity["Group identity privileged access"]
+    contracts["Canonical API event contracts"]
+    adapters["Strangler adapters"]
+    policy["Regional brand policy"]
+  end
+  subgraph target["Target business capabilities"]
+    commerce["Commerce channel services"]
+    orders["OMS order services"]
+    inventory["Inventory availability and reservation"]
+    payments["PSP token boundary"]
+    loyalty["Customer loyalty services"]
+  end
+  subgraph governance["Migration evidence"]
+    wave["Wave readiness gates"]
+    recon["Reconciliation controls"]
+    rollback["Rollback coexistence plan"]
+    audit["Migration evidence store"]
+  end
+  legacy --> adapters
+  adapters --> contracts
+  identity --> target
+  contracts --> commerce
+  contracts --> orders
+  contracts --> inventory
+  contracts --> loyalty
+  payments --> orders
+  policy --> wave
+  wave --> recon
+  wave --> rollback
+  recon --> audit`,
       deploymentCode:`flowchart TB
   subgraph legacy["Legacy estate"]
     pos["Brand POS systems"]
@@ -2753,6 +3060,54 @@ function buildRetailWorkloadDiagrams(facts){
   platform --> erp
   stores --> psp
   platform --> ops`,
+    solutionCode:`flowchart TB
+  subgraph store["Store autonomy"]
+    associates["Associates customers"]
+    pos["POS lanes mobile apps"]
+    edgeSvc["Store edge runtime"]
+    localQueue["Encrypted durable local queue"]
+    offlineAuth["Offline auth device trust"]
+  end
+  subgraph regional["Regional retail platform"]
+    api["Regional API control plane"]
+    stream["Event stream CDC replay"]
+    conflict["Conflict reroute service"]
+    rollout["Store rollout gate service"]
+  end
+  subgraph data["Retail authority data"]
+    ledger["Inventory order ledger"]
+    projection["Availability projection"]
+    tokenVault["PII payment token vault"]
+    audit["Immutable replay audit"]
+  end
+  subgraph external["External retail systems"]
+    commerce["Ecommerce CMS"]
+    erp["ERP POS core"]
+    psp["PSP P2PE rails"]
+    wms["OMS WMS fulfilment"]
+  end
+  subgraph ops["Ops security"]
+    observability["SLO queue replay dashboards"]
+    security["PKI KMS PCI segmentation"]
+  end
+  associates --> pos
+  pos --> edgeSvc
+  offlineAuth --> edgeSvc
+  pos --> psp
+  edgeSvc --> localQueue
+  localQueue --> stream
+  stream --> api
+  api --> ledger
+  ledger --> projection
+  api --> conflict
+  conflict --> commerce
+  conflict --> erp
+  conflict --> wms
+  rollout --> edgeSvc
+  pos --> tokenVault
+  ledger --> audit
+  api --> observability
+  tokenVault --> security`,
     deploymentCode:`flowchart TB
   subgraph store["Store edge"]
     pos["POS lanes and mobile apps"]
@@ -2817,8 +3172,9 @@ function buildRetailWorkloadDiagrams(facts){
 function buildArchitectureViews(result){
   const facts=getArchitectureFacts(result);
   const retailDiagrams=facts.isAiScenario?null:buildRetailWorkloadDiagrams(facts);
-  const solutionCode=normalizeArchitectureDiagram(buildArchitectureFromRecommendation(result));
-  const solutionVisual=convertArchitectureDiagramToFlowchart(solutionCode);
+  const generatedSolutionCode=normalizeArchitectureDiagram(buildArchitectureFromRecommendation(result));
+  const solutionCode=facts.isAiScenario?generatedSolutionCode:(retailDiagrams.solutionCode||retailDiagrams.deploymentCode||generatedSolutionCode);
+  const solutionVisual=facts.isAiScenario?convertArchitectureDiagramToFlowchart(solutionCode):solutionCode;
   const systemContextCode=facts.isAiScenario?`flowchart LR
   users["Customers and Operators"]
   platform["${escapeMermaidLabel(facts.company)}"]
@@ -3067,19 +3423,241 @@ async function fetchAzurePricing(filter,top=20){
   }catch{return null;}
 }
 
+async function fetchAwsPricing(params={}){
+  const query=new URLSearchParams(params);
+  try{
+    const res=await fetch(`/api/pricing/aws?${query.toString()}`);
+    if(!res.ok) return null;
+    return await res.json();
+  }catch{return null;}
+}
+
+function pricingRegionContext(state={},domain=''){
+  const text=[
+    domain,
+    state?.basics?.company,
+    state?.basics?.industry,
+    state?.basics?.domain,
+    state?.basics?.problem,
+    state?.basics?.stack,
+    state?.basics?.constraints,
+    state?.nfr?.i18n,
+    state?.nfr?.compliance
+  ].filter(Boolean).join(' ').toLowerCase();
+  if(/\b(india|indian|myntra|flipkart|upi|rbi|dpdp|gst|mumbai|bengaluru|bangalore|delhi|hyderabad|chennai|pune)\b/.test(text)){
+    return {label:'India',azureRegion:'centralindia',awsRegion:'ap-south-1',gcpRegion:'asia-south1'};
+  }
+  if(/\b(australia|australian|au east|australia east|sydney|melbourne|perth|brisbane|new zealand|nz)\b/.test(text)){
+    return {label:'Australia/New Zealand',azureRegion:'australiaeast',awsRegion:'ap-southeast-2',gcpRegion:'australia-southeast1'};
+  }
+  if(/\b(united kingdom|uk|london|england|scotland|wales)\b/.test(text)){
+    return {label:'United Kingdom',azureRegion:'uksouth',awsRegion:'eu-west-2',gcpRegion:'europe-west2'};
+  }
+  if(/\b(europe|eu|germany|france|netherlands|ireland|spain|italy|gdpr)\b/.test(text)){
+    return {label:'Europe',azureRegion:'westeurope',awsRegion:'eu-west-1',gcpRegion:'europe-west1'};
+  }
+  if(/\b(united states|usa|us-|america|california|new york|texas|virginia|oregon)\b/.test(text)){
+    return {label:'United States',azureRegion:'eastus',awsRegion:'us-east-1',gcpRegion:'us-east4'};
+  }
+  return {label:'Region not confirmed',azureRegion:null,awsRegion:null,gcpRegion:null};
+}
+
+function hasAiPricingScope(state={},domain=''){
+  const text=[
+    domain,
+    state?.basics?.domain,
+    state?.basics?.problem,
+    state?.basics?.stack,
+    state?.basics?.constraints,
+    state?.nfr?.maintainability,
+    state?.nfr?.auditability
+  ].filter(Boolean).join(' ').toLowerCase();
+  return /\b(ai|ml|llm|genai|model|rag|copilot|chatbot|agentic|recommendation|recommendations|personalisation|personalization|forecasting|prediction|semantic search)\b/.test(text);
+}
+
+function azurePriceText(item){
+  return [
+    item?.serviceName,
+    item?.productName,
+    item?.skuName,
+    item?.meterName,
+    item?.unitOfMeasure,
+    item?.armRegionName
+  ].filter(Boolean).join(' ');
+}
+
+function isEnterpriseRelevantAzurePostgresPrice(item){
+  const price=Number(item?.unitPrice);
+  const unit=String(item?.unitOfMeasure||'').toLowerCase();
+  const text=azurePriceText(item).toLowerCase();
+  if(!Number.isFinite(price)||price<=0) return false;
+  if(!/hour/.test(unit)) return false;
+  if(String(item?.type||'').toLowerCase()!=='consumption') return false;
+  if(item?.reservationTerm) return false;
+  if(price>50) return false;
+  if(/reservation|reserved|savings|burstable|basic|free|dev\/?test|preview|b1ms|b1s|b2s|backup|storage|snapshot|log|iops|io request|data transfer|cosmos db|single server|horizondb|oriondb/.test(text)) return false;
+  const looksLikeCompute=/flexible server/.test(text)&&/general purpose|memory optimized|business critical|vcore|compute/.test(text);
+  return looksLikeCompute&&price>=0.08;
+}
+
+function azureVCoreCount(item){
+  const text=[item?.skuName,item?.meterName,item?.armSkuName].filter(Boolean).join(' ');
+  const match=text.match(/\b(\d+)\s*vcore\b/i)||text.match(/standard_[a-z]+(\d+)/i);
+  return match?Number(match[1]):0;
+}
+
+function chooseAzurePostgresEvidence(items){
+  const candidates=(items||[]).filter(isEnterpriseRelevantAzurePostgresPrice);
+  if(!candidates.length) return null;
+  return candidates
+    .map(item=>{
+      const cores=azureVCoreCount(item);
+      const tier=/memory optimized/i.test(azurePriceText(item))?2:/general purpose/i.test(azurePriceText(item))?3:1;
+      const coreScore=cores>=16&&cores<=64?3:cores>=8&&cores<16?2:cores>64?1:0;
+      return {item,score:tier*10+coreScore};
+    })
+    .sort((a,b)=>b.score-a.score||Number(b.item.unitPrice||0)-Number(a.item.unitPrice||0))[0].item;
+}
+
+function addPricingEvidence(ctx,line,source){
+  ctx.summary.push(line);
+  ctx.usablePricePoints.push({line,source});
+}
+
+function formatAzureSku(item){
+  return item?.armSkuName||[item?.skuName,item?.meterName].filter(Boolean).join(' / ')||item?.productName||'qualified SKU';
+}
+
+function awsOnDemandHourlyPrice(product,terms){
+  const sku=product?.sku;
+  const skuTerms=sku&&terms?.[sku]?Object.values(terms[sku]):[];
+  for(const term of skuTerms){
+    const dimensions=Object.values(term?.priceDimensions||{});
+    for(const dim of dimensions){
+      const usd=Number(dim?.pricePerUnit?.USD);
+      if(Number.isFinite(usd)&&usd>0&&/hrs|hour/i.test(String(dim?.unit||dim?.description||''))){
+        return usd;
+      }
+    }
+  }
+  return null;
+}
+
+function chooseAwsRdsEvidence(data){
+  const products=Array.isArray(data?.sampleProducts)?data.sampleProducts:[];
+  const scored=products.map(product=>{
+    const attrs=product.attributes||{};
+    const price=awsOnDemandHourlyPrice(product,data?.sampleTerms);
+    const instance=String(attrs.instanceType||'');
+    const engine=String(attrs.databaseEngine||'');
+    const deployment=String(attrs.deploymentOption||'');
+    if(!price||!/postgresql/i.test(engine)) return null;
+    if(!/^db\.(r6g|r6i|r7g|r7i|m6g|m6i|m7g|m7i)\./i.test(instance)) return null;
+    const sizeScore=/8xlarge/i.test(instance)?4:/16xlarge/i.test(instance)?3:/4xlarge/i.test(instance)?2:/2xlarge/i.test(instance)?1:0;
+    const familyScore=/r6g|r7g/i.test(instance)?3:/r6i|r7i/i.test(instance)?2:1;
+    const azScore=/multi-az/i.test(deployment)?2:1;
+    return {product,price,score:familyScore*10+sizeScore+azScore};
+  }).filter(Boolean);
+  return scored.sort((a,b)=>b.score-a.score||b.price-a.price)[0]||null;
+}
+
+function gcpEvidenceText(item){
+  return [
+    item?.service,
+    item?.sku,
+    item?.machine_type,
+    item?.edition,
+    item?.unit,
+    item?.region,
+    item?.source
+  ].filter(Boolean).join(' ');
+}
+
+function isUsableGcpPricingEvidence(item,aiPricing){
+  const text=gcpEvidenceText(item).toLowerCase();
+  const source=String(item?.source||'').toLowerCase();
+  const price=String(item?.price||'');
+  if(!source.includes('cloud.google.com')) return false;
+  if(!/\$|usd|per|hour|request|token|gib|gb|million|1k/i.test(price)) return false;
+  if(!item?.region&&!/vertex|gemini|global/i.test(text)) return false;
+  if(!aiPricing&&/vertex|gemini|ai|model|llm|embedding|token/i.test(text)) return false;
+  if(/cloud sql|postgres/i.test(text)){
+    return !!(item?.machine_type||item?.sku||item?.edition)&&/(db-|custom-|enterprise|enterprise plus|dedicated core|vCPU|vcpu|core)/i.test(text);
+  }
+  if(/cloud run|gke|kubernetes|compute engine/i.test(text)){
+    return !!(item?.sku||item?.machine_type)&&/(cpu|vcpu|memory|gib|node|autopilot|e2-|n2-|c3-|t2a-)/i.test(text);
+  }
+  if(/bigquery|cloud storage|pub\/sub|pubsub|cloud armor|secret manager/i.test(text)){
+    return !!item?.sku||/(analysis|storage|request|operation|message|secret version)/i.test(text);
+  }
+  if(aiPricing&&/vertex|gemini|embedding/i.test(text)){
+    return !!(item?.sku||item?.model)&&/(token|character|request|1k|million)/i.test(`${text} ${price}`);
+  }
+  return false;
+}
+
+function chooseGcpPricingEvidence(items,aiPricing){
+  const usable=(items||[]).filter(item=>isUsableGcpPricingEvidence(item,aiPricing));
+  const priority=item=>{
+    const text=gcpEvidenceText(item).toLowerCase();
+    if(/cloud sql|postgres/.test(text)) return 40;
+    if(/cloud run|gke|kubernetes|compute engine/.test(text)) return 30;
+    if(aiPricing&&/vertex|gemini/.test(text)) return 25;
+    if(/bigquery|pub\/sub|pubsub/.test(text)) return 20;
+    return 10;
+  };
+  return usable.sort((a,b)=>priority(b)-priority(a)).slice(0,6);
+}
+
+function formatGcpPricingEvidence(item){
+  const sku=[item?.sku,item?.machine_type,item?.edition,item?.model].filter(Boolean).join(' / ')||'qualified SKU';
+  const region=item?.region||'global/region not stated';
+  return `GCP ${item.service} (${region}, ${sku}): ${item.price}${item.unit?` ${item.unit}`:''} [official web-search sample; final sizing still required]`;
+}
+
+function formatPricingSummaryForPrompt(pricing){
+  const lines=[];
+  if(pricing?.summary?.length){
+    lines.push(...pricing.summary);
+  }else{
+    lines.push('No service-level live pricing data available.');
+  }
+  if(pricing?.notes?.length){
+    lines.push('Pricing notes:');
+    pricing.notes.slice(0,4).forEach(note=>lines.push(`- ${note}`));
+  }
+  if(pricing?.exclusions?.length){
+    lines.push('Excluded pricing datapoints:');
+    pricing.exclusions.slice(0,4).forEach(note=>lines.push(`- ${note}`));
+  }
+  return lines.join('\n');
+}
+
 // -- GCP pricing via web search ---
-async function fetchGcpPricingViaWebSearch(domain){
+async function fetchGcpPricingViaWebSearch(domain,region){
   const prompt=`Search Google Cloud's official pricing pages and return current GCP pricing for the services most relevant to a ${domain||'cloud'} architecture.
 
-Focus on: Vertex AI (Gemini 1.5 Pro, Gemini 1.5 Flash), Cloud Run, GKE (Autopilot), Cloud SQL (PostgreSQL), Cloud Storage, BigQuery, Pub/Sub, Cloud Armor, and Secret Manager.
+Target region: ${region||'region not confirmed; prefer a clearly stated Google Cloud region if the scenario implies one'}.
+
+Focus on SKU-level entries, not generic product pages:
+- Cloud SQL for PostgreSQL: Enterprise or Enterprise Plus dedicated core / vCPU pricing, including machine type or SKU where published.
+- Compute/GKE/Cloud Run: CPU, memory, node, or Autopilot SKU names where relevant.
+- Vertex AI only if AI/model workloads are relevant: Gemini model name, token or character unit, and source page.
+- BigQuery, Cloud Storage, Pub/Sub, Cloud Armor, Secret Manager: use named SKU/unit such as analysis, storage, request, operation, or message unit.
 
 Return a JSON array of price points  -  no markdown, no explanation:
 [
-  {"service": "Vertex AI Gemini 1.5 Pro", "price": "$0.00125 per 1K input chars", "unit": "per 1K input chars", "region": "us-central1", "source": "cloud.google.com/vertex-ai/pricing"},
+  {"service": "Cloud SQL for PostgreSQL", "sku": "Enterprise Plus dedicated core", "machine_type": "db-custom or published machine shape", "edition": "Enterprise Plus", "price": "$0.XXXX", "unit": "per vCPU hour", "region": "${region||'asia-south1'}", "source": "cloud.google.com/sql/pricing"},
+  {"service": "Vertex AI Gemini", "sku": "Gemini 1.5 Flash input", "model": "gemini-1.5-flash", "price": "$0.XXXX", "unit": "per 1K input tokens or chars", "region": "global or named region", "source": "cloud.google.com/vertex-ai/pricing"},
   ...
 ]
 
-Use web search to verify current prices from cloud.google.com. Return only the JSON array.`;
+Rules:
+- Use only official cloud.google.com sources.
+- Every item must include service, price, unit, region, source, and at least one of sku, machine_type, edition, or model.
+- Do not return generic examples like "Cloud SQL: starts at" without a SKU/tier.
+- Do not include committed-use, free-tier, promotional, or storage-only rows unless the service is explicitly a storage service.
+- Return only the JSON array.`;
   try{
     const data=await callOpenAI({
       apiPath:'/v1/responses',
@@ -3103,30 +3681,47 @@ Use web search to verify current prices from cloud.google.com. Return only the J
   }
 }
 
-async function buildPricingContext(detectedCloud,domain){
-  const ctx={azure:null,aws:null,gcp:{available:false},summary:[]};
+async function buildPricingContext(detectedCloud,domain,state={}){
+  const region=pricingRegionContext(state,domain);
+  const aiPricing=hasAiPricingScope(state,domain);
+  const ctx={azure:null,aws:null,gcp:{available:false},summary:[],usablePricePoints:[],notes:[],exclusions:[],region};
   const tasks=[];
 
   // Azure  -  public REST API, no auth
   if(!detectedCloud||detectedCloud==='azure'){
-    tasks.push(
-      fetchAzurePricing("serviceName eq 'Azure OpenAI'",30).then(items=>{
-        ctx.azure={openai:items};
-        if(items?.length){
-          const gpt4o=items.find(i=>(i.skuName||'').toLowerCase().includes('gpt-4o'));
-          if(gpt4o) ctx.summary.push(`Azure OpenAI gpt-4o: $${gpt4o.unitPrice}/${gpt4o.unitOfMeasure||'unit'} (${gpt4o.armRegionName||'global'})`);
-          const gpt4oMini=items.find(i=>(i.skuName||'').toLowerCase().includes('gpt-4o-mini'));
-          if(gpt4oMini) ctx.summary.push(`Azure OpenAI gpt-4o-mini: $${gpt4oMini.unitPrice}/${gpt4oMini.unitOfMeasure||'unit'}`);
-        }
-      }).catch(()=>{})
-    );
-    tasks.push(
-      fetchAzurePricing("serviceName eq 'Azure Database for PostgreSQL' and armRegionName eq 'australiaeast'",10).then(items=>{
-        if(items?.length){
-          ctx.summary.push(`Azure PostgreSQL Flexible (AU East): $${items[0].unitPrice}/${items[0].unitOfMeasure||'unit'}`);
-        }
-      }).catch(()=>{})
-    );
+    if(aiPricing){
+      tasks.push(
+        fetchAzurePricing("serviceName eq 'Azure OpenAI'",30).then(items=>{
+          ctx.azure={...(ctx.azure||{}),openai:items};
+          if(items?.length){
+            const gpt4o=items.find(i=>(i.skuName||'').toLowerCase().includes('gpt-4o'));
+            if(gpt4o) addPricingEvidence(ctx,`Azure OpenAI gpt-4o: $${gpt4o.unitPrice}/${gpt4o.unitOfMeasure||'unit'} (${gpt4o.armRegionName||'global'})`,'azure-openai');
+            const gpt4oMini=items.find(i=>(i.skuName||'').toLowerCase().includes('gpt-4o-mini'));
+            if(gpt4oMini) addPricingEvidence(ctx,`Azure OpenAI gpt-4o-mini: $${gpt4oMini.unitPrice}/${gpt4oMini.unitOfMeasure||'unit'}`,'azure-openai');
+          }
+        }).catch(()=>{})
+      );
+    }else{
+      ctx.notes.push('Azure OpenAI pricing was skipped because the retail workload does not include an AI/model path.');
+    }
+    if(region.azureRegion){
+      tasks.push(
+        fetchAzurePricing(`serviceName eq 'Azure Database for PostgreSQL' and armRegionName eq '${region.azureRegion}'`,50).then(items=>{
+          ctx.azure={...(ctx.azure||{}),postgres:items};
+          const evidence=chooseAzurePostgresEvidence(items);
+          if(evidence){
+            addPricingEvidence(ctx,`Azure PostgreSQL Flexible sample (${region.label}, ${formatAzureSku(evidence)}): $${evidence.unitPrice}/${evidence.unitOfMeasure||'unit'} [live API sample; final sizing still required]`,'azure-postgresql');
+          }else if(items?.length){
+            const sample=items[0];
+            ctx.exclusions.push(`Azure PostgreSQL ${region.label}: live feed returned ${items.length} item(s), but no enterprise-relevant hourly compute SKU was selected. First returned item was ${formatAzureSku(sample)} at $${sample.unitPrice}/${sample.unitOfMeasure||'unit'} and was excluded from validation.`);
+          }else{
+            ctx.notes.push(`Azure PostgreSQL ${region.label}: no live price items returned for ${region.azureRegion}.`);
+          }
+        }).catch(()=>{})
+      );
+    }else{
+      ctx.notes.push('No region was confirmed, so regional Azure PostgreSQL pricing was not used as validation evidence.');
+    }
   }
 
   // AWS  -  public bulk price list, no auth
@@ -3135,21 +3730,48 @@ async function buildPricingContext(detectedCloud,domain){
       fetch('/api/pricing/aws').then(r=>r.ok?r.json():null).then(data=>{
         if(data?.offers){
           ctx.aws={indexLoaded:true,serviceCount:Object.keys(data.offers).length};
-          ctx.summary.push(`AWS: ${Object.keys(data.offers).length} services in pricing index`);
+          ctx.notes.push(`AWS public pricing index loaded (${Object.keys(data.offers).length} services), but this is not a service-level estimate until SKUs and region ${region.awsRegion||'are confirmed'}.`);
         }
       }).catch(()=>{})
     );
+    if(region.awsRegion){
+      tasks.push(
+        fetchAwsPricing({
+          service:'AmazonRDS',
+          region:region.awsRegion,
+          instanceType:'db.r*g.*xlarge',
+          databaseEngine:'PostgreSQL'
+        }).then(data=>{
+          const evidence=chooseAwsRdsEvidence(data);
+          ctx.aws={...(ctx.aws||{}),rds:data};
+          if(evidence){
+            const attrs=evidence.product.attributes||{};
+            addPricingEvidence(ctx,`AWS RDS PostgreSQL sample (${region.label}, ${attrs.instanceType}, ${attrs.deploymentOption||'deployment not specified'}): $${evidence.price}/hour [live regional SKU sample; final sizing still required]`,'aws-rds');
+          }else if(data?.matchedProducts!==undefined){
+            ctx.exclusions.push(`AWS RDS ${region.label}: matched ${data.matchedProducts} regional product(s), but no enterprise PostgreSQL on-demand hourly SKU was selected.`);
+          }
+        }).catch(()=>{})
+      );
+    }
   }
 
   // GCP  -  no public API without OAuth, use web search instead
   if(!detectedCloud||detectedCloud==='gcp'){
     tasks.push(
-      fetchGcpPricingViaWebSearch(domain).then(items=>{
+      fetchGcpPricingViaWebSearch(domain,region.gcpRegion).then(items=>{
         if(items?.length){
-          ctx.gcp={available:true,source:'web_search',items};
-          items.slice(0,6).forEach(i=>{
-            ctx.summary.push(`GCP ${i.service}: ${i.price}${i.region?` (${i.region})`:''} [web search]`);
+          const usableItems=chooseGcpPricingEvidence(items,aiPricing);
+          ctx.gcp={available:usableItems.length>0,source:'web_search',items,usableItems};
+          usableItems.forEach(i=>{
+            addPricingEvidence(ctx,formatGcpPricingEvidence(i),'gcp-web-search');
           });
+          const excluded=items.length-usableItems.length;
+          if(excluded>0){
+            ctx.exclusions.push(`GCP web search returned ${items.length} item(s); ${excluded} were excluded because they lacked official source, region, SKU/tier, usable unit, or matched AI pricing outside the scenario scope.`);
+          }
+          if(!usableItems.length){
+            ctx.notes.push('GCP web search did not return SKU-level pricing evidence usable for validation.');
+          }
         }else{
           ctx.gcp={available:false,note:'GCP pricing not found via web search'};
         }
@@ -3201,7 +3823,7 @@ Return this exact JSON shape  -  no markdown, no explanation:
 
 // -- Validation phase ---
 async function runValidationPhase(result,state,research,pricing){
-  const pricingSummary=pricing?.summary?.length?pricing.summary.join('\n'):'No live pricing data available.';
+  const pricingSummary=formatPricingSummaryForPrompt(pricing);
   const researchSummary=research?`Company: ${research.company_profile||''}
 Compliance: ${research.industry_compliance||''}
 Stack notes: ${research.stack_observations||''}
@@ -3377,7 +3999,7 @@ function applyDeterministicValidationGates(validation,result,state,research,pric
       }
     }
 
-    const hasServicePricing=pricing?.summary?.some(item=>/\$|per\s|vcpu|gb|hour|request|million|unit|acu|iops/i.test(String(item)));
+    const hasServicePricing=(pricing?.usablePricePoints||[]).length>0;
     if(!hasServicePricing){
       v.warnings=addUniqueValidationItem(v.warnings,'Retail pricing should remain marked as partial or assumption unless service-level pricing is available for the named commerce, data, network, security, observability, and edge components.');
     }
@@ -3738,15 +4360,15 @@ async function generate(){
   try{
     const stackLow=(b.stack||'').toLowerCase();
     const cloud=stackLow.includes('azure')?'azure':stackLow.includes('aws')?'aws':stackLow.includes('gcp')||stackLow.includes('google')?'gcp':null;
-    const pricing=await buildPricingContext(cloud,b.domain);
+    const pricing=await buildPricingContext(cloud,b.domain,S);
     LAST_PRICING_CONTEXT=pricing;
-    const pts=pricing.summary?.length||0;
+    const pts=pricing.usablePricePoints?.length||0;
     const azureOk=!!pricing.azure;
     const awsOk=!!pricing.aws?.indexLoaded;
     const gcpOk=!!pricing.gcp?.available;
     const sources=[azureOk&&'Azure',awsOk&&'AWS',gcpOk&&'GCP (web)'].filter(Boolean);
     setPipelineStage('pricing','done',`${sources.join(' - ')||' - '} - ${pts} price point(s)`);
-    logEvent('info','pricing.completed',{points:pts,azureOk,awsOk});
+    logEvent('info','pricing.completed',{points:pts,azureOk,awsOk,excluded:pricing.exclusions?.length||0,region:pricing.region?.label||'unknown'});
   }catch(err){
     setPipelineStage('pricing','warn','Pricing unavailable  -  using model estimates only');
     logEvent('warn','pricing.failed',{message:err.message});
@@ -3788,7 +4410,7 @@ async function generate(){
   const nfrSummary=NF.map(([key])=>`${key}: ${S.nfr[key]||'not specified'}`).join('\n');
 
   const researchBlock=LAST_RESEARCH?`\nRESEARCH FINDINGS (web-verified):\nCompany: ${LAST_RESEARCH.company_profile||''}\nStack notes: ${LAST_RESEARCH.stack_observations||''}\nCompliance: ${LAST_RESEARCH.industry_compliance||''}\nPatterns: ${LAST_RESEARCH.competitor_patterns||''}\nRed flags: ${(LAST_RESEARCH.red_flags||[]).join('; ')}\n`:'';
-  const pricingBlock=LAST_PRICING_CONTEXT?.summary?.length?`\nLIVE PRICING (from pricing APIs):\n${LAST_PRICING_CONTEXT.summary.join('\n')}\n`:'';
+  const pricingBlock=LAST_PRICING_CONTEXT?`\nLIVE PRICING (from pricing APIs; excluded datapoints are not validation evidence):\n${formatPricingSummaryForPrompt(LAST_PRICING_CONTEXT)}\n`:'';
   const contraBlock=contradictions.length?`\nINPUT WARNINGS (address in your recommendation):\n${contradictions.map(i=>`[${i.severity.toUpperCase()}] ${i.msg}`).join('\n')}\n`:'';
   const userPrompt=`Generate a full solution architecture recommendation for this client using the exact rules and JSON output contract from the system prompt.
 Date of generation: ${new Date().toISOString().slice(0,10)}.
@@ -3833,7 +4455,7 @@ OUTPUT AUDIENCE: ${AUDIENCE_VIEW==='executive'?'Executive / non-technical stakeh
 Return only the JSON object. Do not wrap it in markdown.`;
 
   try{
-    logEvent('info','generation.started',{company:b.company,model:'gpt-5.4',hasResearch:!!LAST_RESEARCH,hasPricing:!!(LAST_PRICING_CONTEXT?.summary?.length),contradictions:contradictions.length});
+    logEvent('info','generation.started',{company:b.company,model:'gpt-5.4',hasResearch:!!LAST_RESEARCH,hasPricing:!!(LAST_PRICING_CONTEXT?.usablePricePoints?.length),contradictions:contradictions.length});
     let result=null;
     let generationFailure=null;
     for(let attempt=1;attempt<=2;attempt++){
@@ -3947,10 +4569,9 @@ function chooseDefaultTier(tiers){
 
 function getPricingEvidenceStatus(result){
   const status=String(result?.evidence_status?.pricing||'').toLowerCase();
-  const summaries=LAST_PRICING_CONTEXT?.summary||[];
-  const serviceLevel=summaries.some(item=>/\$|per\s|token|acu|vcpu|gb|hour|request|million|unit/i.test(String(item)));
+  const serviceLevel=(LAST_PRICING_CONTEXT?.usablePricePoints||[]).length>0;
   if(status==='verified'&&serviceLevel) return {label:'Verified pricing',cls:'price-live'};
-  if(status==='partial'||summaries.length||serviceLevel) return {label:'Pricing partially verified',cls:'price-partial'};
+  if(status==='partial'||serviceLevel) return {label:'Pricing partially verified',cls:'price-partial'};
   return {label:'Pricing assumptions',cls:'price-assumption'};
 }
 
@@ -4083,8 +4704,9 @@ export function showOutput(result,contradictions=[],research=null,validation=nul
   const reviewPack=buildRetailArchitectureReviewPack(S,result,research,LAST_PRICING_CONTEXT,validation);
   const consultingPack=buildConsultingDeliveryPack(S,result,activeTier,validation);
   const reviewerWorkflow=buildReviewerWorkflowCard(validation);
+  const clientReadyGate=buildClientReadyGateCard(S,result,validation,activeTier);
 
-  document.getElementById('out').innerHTML=`${viewBar}${execBanner}${researchCard?`<div class="tech-only">${researchCard}</div>`:''}${contraCard}${validationCard?`<div class="tech-only">${validationCard}</div>`:''}${intelligenceCard}${boardCard}${reviewerWorkflow}${reviewPack}${consultingPack}<div class="out-summary">${escapeHtml(result.executive_summary||'-')}</div><div class="tier-selector">${tierCards}</div><div class="card"><div class="card-head"><div class="card-head-dot"></div>Architecture recommendation  -  ${escapeHtml(activeTier.label)} ${priceBadge}</div><table class="stack-table"><thead><tr><th style="width:130px">Layer</th><th class="tech-only" style="width:150px">Technology</th><th>Rationale</th><th class="tech-only" style="width:120px">Monthly est.</th></tr></thead><tbody>${stackRows}</tbody></table></div><div class="tech-only">${architectureSection}</div><div class="card tech-only"><div class="card-head"><div class="card-head-dot"></div>Cost breakdown  -  ${escapeHtml(activeTier.label)}</div><div class="cost-breakdown"><div class="cost-c"><div class="cost-tier-label">AI / APIs</div><div class="cost-val" style="font-size:15px">${escapeHtml(breakdown.llm_api||'-')}</div></div><div class="cost-c"><div class="cost-tier-label">Compute</div><div class="cost-val" style="font-size:15px">${escapeHtml(breakdown.compute||'-')}</div></div><div class="cost-c"><div class="cost-tier-label">Storage</div><div class="cost-val" style="font-size:15px">${escapeHtml(breakdown.storage||'-')}</div></div><div class="cost-c"><div class="cost-tier-label">Networking</div><div class="cost-val" style="font-size:15px">${escapeHtml(breakdown.networking||'-')}</div></div><div class="cost-c"><div class="cost-tier-label">Tooling</div><div class="cost-val" style="font-size:15px">${escapeHtml(breakdown.tooling||'-')}</div></div></div><div class="cost-driver" style="margin-top:1rem">Biggest cost driver: ${escapeHtml(activeTier.biggest_cost_driver||'-')}</div></div><div class="card"><div class="card-head"><div class="card-head-dot"></div>Risk register</div>${risks}</div><div class="card tech-only"><div class="card-head"><div class="card-head-dot"></div>Decision rationale</div>${decisions}</div><div class="card"><div class="card-head"><div class="card-head-dot"></div>Implementation roadmap</div><div class="roadmap-timeline">${roadmap}</div></div><div class="card"><div class="card-head"><div class="card-head-dot"></div>Immediate next steps</div>${nextSteps}</div><div class="card"><div class="card-head"><div class="card-head-dot"></div>Disclaimer</div><div class="risk-fix">${escapeHtml(result.disclaimer||'-')}</div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem;gap:1rem;flex-wrap:wrap"><button class="btn" onclick="newEngagement()">New engagement</button><button class="btn pri" onclick="window.print()">Print / Save as PDF</button></div>`;
+  document.getElementById('out').innerHTML=`${viewBar}${execBanner}${researchCard?`<div class="tech-only">${researchCard}</div>`:''}${contraCard}${validationCard?`<div class="tech-only">${validationCard}</div>`:''}${intelligenceCard}${boardCard}${reviewerWorkflow}${clientReadyGate}${reviewPack}${consultingPack}<div class="out-summary">${escapeHtml(result.executive_summary||'-')}</div><div class="tier-selector">${tierCards}</div><div class="card"><div class="card-head"><div class="card-head-dot"></div>Architecture recommendation  -  ${escapeHtml(activeTier.label)} ${priceBadge}</div><table class="stack-table"><thead><tr><th style="width:130px">Layer</th><th class="tech-only" style="width:150px">Technology</th><th>Rationale</th><th class="tech-only" style="width:120px">Monthly est.</th></tr></thead><tbody>${stackRows}</tbody></table></div><div class="tech-only">${architectureSection}</div><div class="card tech-only"><div class="card-head"><div class="card-head-dot"></div>Cost breakdown  -  ${escapeHtml(activeTier.label)}</div><div class="cost-breakdown"><div class="cost-c"><div class="cost-tier-label">AI / APIs</div><div class="cost-val" style="font-size:15px">${escapeHtml(breakdown.llm_api||'-')}</div></div><div class="cost-c"><div class="cost-tier-label">Compute</div><div class="cost-val" style="font-size:15px">${escapeHtml(breakdown.compute||'-')}</div></div><div class="cost-c"><div class="cost-tier-label">Storage</div><div class="cost-val" style="font-size:15px">${escapeHtml(breakdown.storage||'-')}</div></div><div class="cost-c"><div class="cost-tier-label">Networking</div><div class="cost-val" style="font-size:15px">${escapeHtml(breakdown.networking||'-')}</div></div><div class="cost-c"><div class="cost-tier-label">Tooling</div><div class="cost-val" style="font-size:15px">${escapeHtml(breakdown.tooling||breakdown.observability_tooling||'-')}</div></div></div><div class="cost-driver" style="margin-top:1rem">Biggest cost driver: ${escapeHtml(activeTier.biggest_cost_driver||'-')}</div></div><div class="card"><div class="card-head"><div class="card-head-dot"></div>Risk register</div>${risks}</div><div class="card tech-only"><div class="card-head"><div class="card-head-dot"></div>Decision rationale</div>${decisions}</div><div class="card"><div class="card-head"><div class="card-head-dot"></div>Implementation roadmap</div><div class="roadmap-timeline">${roadmap}</div></div><div class="card"><div class="card-head"><div class="card-head-dot"></div>Immediate next steps</div>${nextSteps}</div><div class="card"><div class="card-head"><div class="card-head-dot"></div>Disclaimer</div><div class="risk-fix">${escapeHtml(result.disclaimer||'-')}</div></div><div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem;gap:1rem;flex-wrap:wrap"><button class="btn" onclick="newEngagement()">New engagement</button><div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn" onclick="printReviewDraft()">Print review draft</button><button class="btn pri" onclick="printClientReady()">Client-ready export</button></div></div>`;
 
   setAudience(AUDIENCE_VIEW);
   if(window.__activeTierViews){
@@ -4134,7 +4756,7 @@ if(typeof window!=='undefined'){
     setTier, setAudience, newEngagement, toggleLogs, setLogScope,
     clearClientLogs, clearServerLogs, refreshServerLogs, loadScenario,
     setArchitecturePanel, setArchitectureDisplay, copyArchitectureCode,
-    setReviewDecision
+    setReviewDecision, printReviewDraft, printClientReady
   });
 }
 

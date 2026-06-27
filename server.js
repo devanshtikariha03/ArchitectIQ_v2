@@ -519,9 +519,11 @@ const server = http.createServer((req, res) => {
   if (req.method === 'GET' && parsed.pathname === '/api/pricing/aws') {
     const service = (parsed.query.service || '').replace(/[^A-Za-z0-9]/g, '');
     const region = (parsed.query.region || '').replace(/[^a-z0-9-]/g, '');
+    const instanceType = (parsed.query.instanceType || '').replace(/[^A-Za-z0-9.*_-]/g, '');
+    const databaseEngine = (parsed.query.databaseEngine || '').replace(/[^A-Za-z0-9 +_-]/g, '').toLowerCase();
     const dryrunValue = String(parsed.query.dryrun || '').toLowerCase();
     const isDryRun = dryrunValue === '1' || dryrunValue === 'true' || dryrunValue === 'yes';
-    const MAX_BYTES = 2 * 1024 * 1024; // 2 MB cap — price files can be huge
+    const MAX_BYTES = 25 * 1024 * 1024; // AWS regional price files can be huge.
     const awsPath = service && region
       ? `/offers/v1.0/aws/${service}/current/${region}/index.json`
       : service
@@ -529,7 +531,7 @@ const server = http.createServer((req, res) => {
         : '/offers/v1.0/aws/index.json';
     if (isDryRun) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
-      res.end(JSON.stringify({ ok: true, dryrun: true, service, region, path: awsPath }));
+      res.end(JSON.stringify({ ok: true, dryrun: true, service, region, instanceType, databaseEngine, path: awsPath }));
       return;
     }
     const options = {
@@ -559,7 +561,17 @@ const server = http.createServer((req, res) => {
           const data = JSON.parse(raw);
           // For full price lists, return a useful summary instead of the whole file
           if (data.products && data.terms) {
-            const products = Object.values(data.products).slice(0, 60);
+            const allProducts = Object.values(data.products);
+            const instanceRegex = instanceType
+              ? new RegExp(`^${instanceType.replace(/\*/g, '.*')}$`, 'i')
+              : null;
+            const filteredProducts = allProducts.filter(product => {
+              const attrs = product.attributes || {};
+              if (instanceRegex && !instanceRegex.test(String(attrs.instanceType || ''))) return false;
+              if (databaseEngine && !String(attrs.databaseEngine || attrs.databaseEdition || '').toLowerCase().includes(databaseEngine)) return false;
+              return true;
+            });
+            const products = (instanceRegex || databaseEngine ? filteredProducts : allProducts).slice(0, 80);
             const skus = new Set(products.map(p => p.sku));
             const terms = {};
             for (const sku of skus) {
@@ -572,6 +584,7 @@ const server = http.createServer((req, res) => {
               service,
               region,
               totalProducts: Object.keys(data.products).length,
+              matchedProducts: instanceRegex || databaseEngine ? filteredProducts.length : undefined,
               truncated,
               sampleProducts: products,
               sampleTerms: terms

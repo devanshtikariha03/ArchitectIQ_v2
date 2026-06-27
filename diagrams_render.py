@@ -438,7 +438,7 @@ def class_for_node(node):
 def generate_dynamic_source(payload, graph):
     title = safe_text(payload.get("title"), "architectiq-diagram")
     panel = payload.get("panel", "solution")
-    direction = "LR" if panel in {"context", "request"} else "TB"
+    direction = "TB" if panel == "deployment" else "LR"
     node_classes = {class_for_node(node) for node in graph["nodes"].values()}
     imports = ["from diagrams import Cluster, Diagram, Edge"]
     imports.extend(sorted(f"from {cls.__module__} import {cls.__name__}" for cls in node_classes))
@@ -482,7 +482,7 @@ def generate_dynamic_source(payload, graph):
 def render_dynamic_panel(payload, graph):
     title = safe_text(payload.get("title"), "architectiq-diagram")
     panel = payload.get("panel", "solution")
-    direction = "LR" if panel in {"context", "request"} else "TB"
+    direction = "TB" if panel == "deployment" else "LR"
     source = generate_dynamic_source(payload, graph)
     graph_attr = {
         "pad": "0.2",
