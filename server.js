@@ -21,6 +21,9 @@ const LOG_FILE = path.join(LOG_DIR, 'architectiq.log');
 const DIAGRAMS_RENDERER = path.join(__dirname, 'diagrams_render.py');
 const GRAPHVIZ_BIN = path.join('C:', 'Program Files', 'Graphviz', 'bin');
 const WINDOWS_PY_LAUNCHER = path.join('C:', 'Windows', 'py.exe');
+const LOCAL_VENV_PYTHON = process.platform === 'win32'
+  ? path.join(__dirname, '.venv', 'Scripts', 'python.exe')
+  : path.join(__dirname, '.venv', 'bin', 'python');
 
 function ensureLogDir() {
   if (!fs.existsSync(LOG_DIR)) fs.mkdirSync(LOG_DIR, { recursive: true });
@@ -274,6 +277,10 @@ function getPythonInvocation() {
   const custom = process.env.PYTHON_BIN && process.env.PYTHON_BIN.trim();
   if (custom) {
     return { command: custom, args: [] };
+  }
+
+  if (fs.existsSync(LOCAL_VENV_PYTHON)) {
+    return { command: LOCAL_VENV_PYTHON, args: [] };
   }
 
   if (process.platform === 'win32') {
