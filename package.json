@@ -5,6 +5,7 @@
   "main": "server.js",
   "scripts": {
     "start": "node server.js",
+    "render-build": "npm install && python3 -m pip install --user -r requirements.txt && npm --prefix landing install && npm --prefix landing run build",
     "test": "node test-harness/stress.js",
     "test:llm": "node test-harness/stress-llm.js",
     "test:all": "node test-harness/stress.js && node test-harness/stress-llm.js",

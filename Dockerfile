@@ -13,9 +13,15 @@ RUN pip3 install --no-cache-dir diagrams --break-system-packages
 
 WORKDIR /app
 
-# Install Node dependencies first (cached layer unless package.json changes)
-COPY package.json ./
-RUN npm install --omit=dev
+# Install root Node dependencies first (cached layer unless package files change)
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+
+# Build the Vite frontend inside the image
+COPY landing/package.json landing/package-lock.json ./landing/
+RUN npm --prefix landing ci
+COPY landing ./landing
+RUN npm --prefix landing run build
 
 # Copy application files
 COPY server.js ./
