@@ -2629,6 +2629,103 @@
   margin-top: 4px;
 }
 
+.app-root .architecture-annotation-section {
+  border-color: rgba(79,142,255,0.26);
+}
+
+.app-root .annotation-grid {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 5px;
+}
+
+.app-root .annotation-row {
+  display: grid;
+  grid-template-columns: 42px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+  font-size: 10.5px;
+  line-height: 1.35;
+  color: var(--subtle);
+}
+
+.app-root .annotation-code {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 20px;
+  border-radius: 4px;
+  background: rgba(79,142,255,0.12);
+  border: 1px solid rgba(79,142,255,0.22);
+  color: var(--blue);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.app-root .annotation-active {
+  margin-top: 10px;
+  padding-top: 8px;
+  border-top: 1px solid var(--border);
+}
+
+.app-root .annotation-active ul {
+  margin: 5px 0 0;
+  padding-left: 16px;
+  color: var(--subtle);
+  font-size: 10.5px;
+  line-height: 1.45;
+}
+
+.app-root .network-legend,
+.app-root .status-legend {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.app-root .network-legend-row,
+.app-root .status-legend-row {
+  display: grid;
+  grid-template-columns: 38px minmax(0, 1fr);
+  gap: 8px;
+  align-items: center;
+}
+
+.app-root .network-legend-row strong,
+.app-root .status-legend-row strong {
+  display: block;
+  color: var(--text);
+  font-size: 11px;
+  line-height: 1.2;
+}
+
+.app-root .network-legend-row span:not(.network-swatch),
+.app-root .status-legend-row span:not(.status-swatch) {
+  display: block;
+  color: var(--subtle);
+  font-size: 10px;
+  line-height: 1.3;
+}
+
+.app-root .network-swatch,
+.app-root .status-swatch {
+  width: 34px;
+  height: 24px;
+  border-radius: 5px;
+  border: 1px solid rgba(255,255,255,0.18);
+  display: block;
+}
+
+.app-root .swatch-1 { background: #7ec8e3; }
+.app-root .swatch-2 { background: #dcb96e; }
+.app-root .swatch-3 { background: #b8a7c9; }
+.app-root .status-1 { background: #4f7d25; }
+.app-root .status-2 { background: #b28a00; }
+.app-root .status-3 { background: #d68aa6; }
+.app-root .status-4 { background: #8f969e; }
+
 .app-root .client-ready-gate.pass {
   border-color: rgba(52,211,153,0.28);
 }

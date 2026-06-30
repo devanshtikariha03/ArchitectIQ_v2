@@ -494,7 +494,7 @@ Required for retail outputs:
 - Define POS/e-commerce/ERP/OMS/WMS integration ownership, idempotency keys, retry policy, dead letters, replay, reconciliation, duplicate handling, and manual correction.
 - If stores, POS, or offline trading are involved, define local autonomy, edge appliance HA/failure behavior, offline payment mode boundaries, queue durability, ordering, replay/idempotency, conflict policy, and reconnect acceptance tests.
 - If payments are involved, keep raw PAN/SAD out of internal systems unless explicitly in PCI scope; define payment-provider/P2PE/tokenization boundary, network segmentation, logging controls, and QSA/human validation.
-- If customer or loyalty data is involved, define consent, tokenisation/pseudonymisation, retention, deletion, DSAR/erasure handling, regional data ownership, support access, and analytics minimisation.
+- If customer or loyalty data is involved, define encryption first: data classification, encryption in transit, encryption at rest, key ownership/rotation, secrets handling, log redaction, consent, tokenisation/pseudonymisation, retention, deletion, DSAR/erasure handling, regional data ownership, support access, and analytics minimisation.
 - If global or multi-brand retail is involved, define regional/residency matrix for customer data, logs, telemetry, backups, support bundles, token vault metadata, and third-party SaaS processors.
 - Roadmap must include pilot wave criteria, store/channel rollout gates, rollback triggers, operational owners, runbooks, game days, and measurable acceptance tests.
 
@@ -514,8 +514,15 @@ Rules:
 - Use explicit workload assumptions for LLM/API costs: requests/day, turns/request, input/output tokens, cache hit rate, model routing split, and peak multiplier where possible.
 - If those assumptions are missing, create reasonable assumptions and mark them for validation.
 - Break down compute, LLM/API, storage, networking, observability/tooling, security, licensing, partner/implementation, and contingency where relevant.
+- For FinOps, identify unit drivers and levers: requests, transactions, data volume, egress, IOPS, queue throughput, log/trace retention, non-prod parity, reserved/committed spend, autoscaling limits, SaaS licensing, support plan, and contingency.
 - Do not call a tier selected/recommended if it exceeds hard budget without a mitigation plan.
 - Optimised may be cheaper than recommended only through credible commitments or engineering controls, not by silently reducing required capability.
+
+## Scaling And Security Detail Rules
+
+- Scaling must be described mechanically: autoscaling signal, queue lag SLO, connection pooling, cache hit target, backpressure, rate limit, quota, load-test scenario, degraded mode, and first expected bottleneck.
+- Security must start with encryption and key management before tokenisation/masking: TLS 1.2+ or SSH equivalent in transit, KMS/HSM/CMEK/CSEK at rest, field/app-layer encryption for highly sensitive data, secret manager for credentials, key rotation owner, and logging exclusions.
+- Sensitive-data claims should use annotation-style codes where useful: A1 secret-manager credentials, A2 system-to-system encrypted credentials, CA1 strong user auth/MFA, CA2 username/password, R2/R3 encryption at rest, T encryption in transit, C3/C5 data class, C5E app/PGP encryption, and trust-boundary/security-boundary evidence.
 
 ## Diagram Rules
 
@@ -533,6 +540,9 @@ Diagrams must help humans reason. They should show:
 - Human escalation path
 - Fallback/degraded paths
 - Critical ownership boundaries
+- Security annotations for auth, encryption, data classification, external security boundary, and trust boundary.
+- Network/provider legend for cloud, on-prem, SaaS, and third-party systems.
+- Component-status legend for existing, updated, new, and supported-but-out-of-scope components.
 
 Avoid diagrams that are only service inventories.
 
@@ -661,9 +671,12 @@ Revise before final output if any of these are true:
 const ARCHITECT_THINKING_PLAYBOOK=[
   {id:'business-outcome-first',keywords:['all'],principle:'Start from the business outcome before selecting technology.',trigger:'Any scenario with an unclear or broad problem statement.',architect_question:'What measurable business outcome must this architecture improve, and what happens if it fails?',validation_rule:'Every major component must trace to a business requirement, NFR, risk, or constraint.',risk_if_ignored:'The design may optimise for tools instead of client value.'},
   {id:'nfr-first-class',keywords:['all'],principle:'Treat non-functional requirements as design constraints, not post-design checks.',trigger:'Any scenario with uptime, latency, RTO/RPO, compliance, scale, or budget constraints.',architect_question:'Which NFRs are hard constraints, and which are negotiable trade-offs?',validation_rule:'Availability, scalability, security, DR, cost, and compliance must have mechanisms and failure consequences.',risk_if_ignored:'The recommendation can look complete but fail in production or review.'},
+  {id:'finops-unit-economics',keywords:['cost','budget','finops','pricing','monthly','reserved','savings','cloud spend','egress','iops','observability','license','licensing'],principle:'FinOps starts with workload drivers, unit economics, and cost controls, not only a monthly total.',trigger:'Any architecture with a budget, cloud services, SaaS, large data volume, or enterprise scale.',architect_question:'Which usage drivers, pricing SKUs, non-prod environments, support fees, egress, IOPS, log retention, and committed-spend assumptions drive the bill?',validation_rule:'Recommendation must name biggest cost drivers, right-sizing or commitment levers, observability/retention controls, non-prod parity assumptions, and FinOps owner validation.',risk_if_ignored:'The design may be architecturally sound but financially indefensible.'},
+  {id:'scaling-mechanics',keywords:['scale','scaling','autoscale','peak','rps','transactions','concurrency','throughput','latency','queue','cache','consumer lag','burst','black friday','campaign'],principle:'Scalability is proven through bottleneck mechanics, backpressure, load tests, and degradation policy.',trigger:'Any scenario with peak traffic, high concurrency, event processing, low latency, or fast growth.',architect_question:'Where does the system bottleneck first, and what happens when read traffic, writes, queues, database connections, or downstream dependencies saturate?',validation_rule:'Recommendation must state autoscaling signals, quotas, connection pooling, cache strategy, backpressure, queue lag SLOs, peak test criteria, and degraded-mode behavior.',risk_if_ignored:'The architecture may say it scales but still collapse under real traffic shape.'},
   {id:'tradeoff-explicit',keywords:['all'],principle:'State alternatives, rejected options, accepted risks, and mitigations for every significant decision.',trigger:'Any recommendation that selects a cloud, database, integration pattern, security model, or delivery sequence.',architect_question:'What credible alternative was rejected, and what risk are we accepting by choosing this option?',validation_rule:'Decision rationale must include at least four explicit trade-offs tied to client constraints.',risk_if_ignored:'The output feels generic and cannot be defended by a senior architect.'},
   {id:'operability-handover',keywords:['all'],principle:'Design for the team that will operate the solution after handover.',trigger:'Any scenario with limited team size, junior engineers, tight timelines, or no dedicated platform team.',architect_question:'Can this team run, troubleshoot, secure, and evolve the architecture without heroic support?',validation_rule:'Roadmap must include observability, rollback, runbooks, ownership, and knowledge-transfer deliverables.',risk_if_ignored:'The design may be technically correct but operationally unrealistic.'},
   {id:'security-cross-cutting',keywords:['security','compliance','pii','phi','payment','fintech','health','government','audit','privacy','identity','mfa','sso'],principle:'Security is embedded across edge, network, application, data, integration, and operations layers.',trigger:'Sensitive data, regulated industries, identity systems, payment flows, health records, or audit-heavy operations.',architect_question:'Where can data, identity, credentials, or privileged access fail across each layer?',validation_rule:'Security controls must be named at each relevant layer with auditability and ownership.',risk_if_ignored:'Security becomes a generic checklist instead of a defensible architecture posture.'},
+  {id:'encryption-before-tokenization',keywords:['pii','phi','payment','token','tokenization','tokenisation','masking','privacy','customer','loyalty','card','pan','sad','secret','kms','hsm','encryption'],principle:'Tokenization and masking do not replace encryption; encryption must be explicit at rest, in transit, key ownership, and application/field layer where data class requires it.',trigger:'Any sensitive data, credentials, payment-adjacent data, PII/PHI, support transcript, customer profile, audit log, or regulated workflow.',architect_question:'Which data is encrypted at rest, in transit, at field/application layer, who owns keys, how are secrets stored, and where are trust boundaries?',validation_rule:'Recommendation and diagrams must show TLS/SSH in transit, KMS/HSM/CMEK/CSEK at rest, secret-manager use, key rotation ownership, data class, tokenization/masking as additional controls, and log redaction.',risk_if_ignored:'The design can claim privacy controls while leaving the primary confidentiality control ambiguous.'},
   {id:'retail-domain-classification',keywords:['retail','e-commerce','ecommerce','commerce','store','stores','pos','checkout','catalogue','catalog','cart','promotion','loyalty','customer profile','inventory','warehouse','fulfilment','fulfillment','click and collect','marketplace'],principle:'Retail architecture starts by classifying the workload: store execution, digital commerce, loyalty/data, supply chain/fulfilment, or retail security/compliance.',trigger:'Any retailer, marketplace, store operator, franchise network, retail group, commerce platform, or customer/loyalty retail workload.',architect_question:'Which retail business capability is being changed, and which systems of record own product, price, promotion, order, payment token, customer, inventory, fulfilment, returns, and audit?',validation_rule:'Recommendation must name retail workload type, systems of record, channel boundaries, data ownership, integration contracts, and rollout/operability assumptions.',risk_if_ignored:'The output may look technically plausible but miss the retail process that actually drives value and risk.'},
   {id:'retail-store-edge-continuity',keywords:['store edge','offline checkout','offline trading','pos','point of sale','store associate','edge node','wan outage','internet dropout','local queue','queue replay','checkout continuity','ups','store appliance','barcode','cash register'],principle:'Store execution architecture must prove local trading continuity without weakening payment, identity, inventory, or audit controls.',trigger:'Stores, POS, offline trading, local edge appliances, associate apps, queue replay, or store network outage requirements.',architect_question:'What keeps checkout safe and auditable when WAN, power, identity, payment, or central inventory paths are degraded?',validation_rule:'Require edge HA/failure behavior, offline auth and payment boundaries, encrypted durable queues, ordering/idempotency, replay tests, conflict policy, reconnect criteria, field runbooks, and pilot acceptance gates.',risk_if_ignored:'Stores may keep trading but later create oversell, payment, privacy, audit, or reconciliation failures.'},
   {id:'retail-commerce-platform',keywords:['storefront','checkout','cart','catalogue','catalog','search','cdn','waf','promotion','campaign','black friday','peak trading','payment provider','fraud','order management','oms'],principle:'Retail commerce platforms must isolate customer-facing read traffic from critical checkout, order, payment, and inventory commit paths.',trigger:'E-commerce modernization, checkout, catalogue/search, campaign traffic, payment flow, fraud, promotions, or online order management.',architect_question:'Which traffic spike or dependency failure can stop customers from browsing, checking out, or receiving accurate fulfilment promises?',validation_rule:'Require CDN/WAF, catalogue/search strategy, cart/session handling, payment-provider boundary, fraud controls, promotion correctness, inventory availability freshness, peak testing, and graceful degradation.',risk_if_ignored:'Campaign peaks or catalogue/search failures can cascade into checkout and inventory accuracy incidents.'},
@@ -1063,6 +1076,10 @@ function architectureBoardChecks(state,result,validation){
   const hasAssumptions=Array.isArray(result?.assumptions)&&result.assumptions.length>=3;
   const hasHumanValidation=Array.isArray(result?.human_validation_needed)&&result.human_validation_needed.length>=3;
   const diagramSummary=summarizeArchitectureDiagram(buildArchitectureViews(recTier).solution.code);
+  const hasEncryptionEvidence=/encrypt|tls|ssh|kms|hsm|cmek|csek|aes|pgp|key rotation|secret manager|at rest|in transit|field.?level|app.?layer/i.test(text);
+  const hasTrustBoundaryEvidence=/trust boundary|security boundary|segmentation|firewall|waf|ips|pci scope|psp boundary|network zone|private subnet|egress/i.test(text);
+  const hasFinopsEvidence=/finops|unit cost|cost driver|reserved|committed|savings plan|right.?siz|egress|iops|retention|non.?prod|licen[sc]|support plan|contingency|budget guardrail/i.test(text);
+  const hasScalingEvidence=/autoscal|keda|queue lag|consumer lag|connection pool|pgbouncer|backpressure|rate limit|quota|cache hit|load test|stress test|peak test|degraded mode|circuit breaker|bulkhead/i.test(text);
   const checks=[
     {
       lens:'Business outcome',
@@ -1084,9 +1101,15 @@ function architectureBoardChecks(state,result,validation){
     },
     {
       lens:'Security and compliance',
-      score:/pci|token|kms|secret|segmentation|identity|mfa|audit|privacy|encryption|p2pe|qsa/i.test(text)?9:5,
-      evidence:'Retail security must cover identity, token paths, PCI/privacy, logging exclusions, and audit.',
-      gap:'Add trust boundaries, PCI/privacy evidence, support-access rules, and owner sign-off.'
+      score:(/pci|token|secret|segmentation|identity|mfa|audit|privacy|p2pe|qsa/i.test(text)&&hasEncryptionEvidence&&hasTrustBoundaryEvidence)?9:5,
+      evidence:'Security must cover encryption, identity, key ownership, token paths, PCI/privacy, logging exclusions, and audit.',
+      gap:'Add encryption-at-rest/in-transit, key ownership, trust boundaries, PCI/privacy evidence, support-access rules, and owner sign-off.'
+    },
+    {
+      lens:'Encryption and trust boundaries',
+      score:(hasEncryptionEvidence&&hasTrustBoundaryEvidence)?9:hasEncryptionEvidence||hasTrustBoundaryEvidence?6:4,
+      evidence:'Tokenisation and masking are not enough; encryption and trust boundaries must be explicit.',
+      gap:'Show TLS/SSH in transit, KMS/HSM/CMEK/CSEK at rest, secret-manager credentials, data class, external security boundary, and trust-boundary evidence.'
     },
     {
       lens:'Data ownership',
@@ -1108,9 +1131,15 @@ function architectureBoardChecks(state,result,validation){
     },
     {
       lens:'Cost and delivery realism',
-      score:tierFitsBudget(recTier)&&/phase|pilot|wave|dependency|owner|done when|acceptance/i.test(text)?8:5,
-      evidence:'The recommended tier must fit budget and roadmap must be deliverable by the stated team.',
-      gap:'Add partner/licensing/contingency cost, sequencing, dependencies, and measurable done-when gates.'
+      score:tierFitsBudget(recTier)&&/phase|pilot|wave|dependency|owner|done when|acceptance/i.test(text)&&hasFinopsEvidence?8:5,
+      evidence:'The recommended tier must fit budget, FinOps evidence, and roadmap deliverability.',
+      gap:'Add FinOps unit drivers, right-sizing/commitment levers, partner/licensing/support/contingency cost, sequencing, dependencies, and measurable done-when gates.'
+    },
+    {
+      lens:'Scaling mechanics',
+      score:hasScalingEvidence?8:5,
+      evidence:'Scaling must identify bottlenecks, autoscaling signals, backpressure, and acceptance tests.',
+      gap:'Add autoscaling signals, queue/consumer lag SLOs, connection pooling, cache strategy, quotas/rate limits, load-test targets, and degraded-mode behavior.'
     },
     {
       lens:'NFR and residency',
@@ -1120,9 +1149,9 @@ function architectureBoardChecks(state,result,validation){
     },
     {
       lens:'Diagram usefulness',
-      score:diagramSummary.groupCount>=4&&diagramSummary.serviceCount>=8&&diagramSummary.edgeCount>=8?8:5,
-      evidence:'Diagrams should show boundaries, actors, data stores, integrations, and fallback paths.',
-      gap:'Use multiple views that match the workload instead of a generic service inventory.'
+      score:diagramSummary.groupCount>=4&&diagramSummary.serviceCount>=8&&diagramSummary.edgeCount>=8&&hasEncryptionEvidence&&hasTrustBoundaryEvidence?8:5,
+      evidence:'Diagrams should show boundaries, actors, data stores, integrations, fallback paths, and security annotations.',
+      gap:'Use multiple workload-specific views with annotation legend for auth, encryption, data class, network/provider zones, trust boundaries, and component status.'
     },
     {
       lens:'Approval readiness',
@@ -2345,6 +2374,130 @@ function getArchitectureDisplayNote(display){
   return 'Rendered diagram mode is optimized for architecture walkthroughs and stakeholder review.';
 }
 
+function buildArchitectureAnnotationModel(facts){
+  const text=[
+    facts?.securityRec,
+    facts?.databaseRec,
+    facts?.storageRec,
+    facts?.queueRec,
+    facts?.apiRec,
+    facts?.edgeRec,
+    facts?.workloadSegments?.join(' ')
+  ].filter(Boolean).join(' ').toLowerCase();
+  const hasPii=/pii|customer|loyalty|profile|phone|address|support|privacy|consent/.test(text);
+  const hasPayment=/payment|psp|pci|token|pan|sad|card/.test(text);
+  const hasSftp=/sftp|file transfer|batch/.test(text);
+  const hasOnPrem=/on-?prem|data center|datacenter|legacy|erp|pos/.test(text);
+  const cloud=/gcp|google/.test(text)?'GCP':/azure|aks|cosmos|service bus/.test(text)?'Azure':/aws|amazon|eks|aurora|rds|s3|msk/.test(text)?'AWS':'Cloud';
+  return {
+    annotations:[
+      ['A1','User/service credentials stored in Secret Manager or equivalent.'],
+      ['A2','System-to-system credentials encrypted with AES-256 and rotated by owner.'],
+      ['CA1','Strong user authentication: MFA, KBA, passwordless, or step-up control.'],
+      ['CA2','Basic username/password only; requires compensating MFA or policy review.'],
+      ['R2','Encryption at rest using customer-supplied or customer-managed keys where required.'],
+      ['R3','Encryption at rest using cloud-managed keys where risk and regulation permit.'],
+      ['T','Encryption in transit using TLS 1.2+ / SSH or equivalent.'],
+      ['C3','Class 3 operational/business data.'],
+      ['C5','Class 5 sensitive PII/payment-adjacent data.'],
+      ['C5E','Class 5 data with field/app-layer encryption or PGP where required.'],
+      ['SB','External security boundary: firewall, WAF, IPS, segmentation, or PSP boundary.'],
+      ['TB','Trust boundary: dotted boundary around different ownership or security zones.']
+    ],
+    active:[
+      hasPii?'C5/C5E expected for customer, loyalty, support, and privacy stores.':'C3 expected unless discovery confirms PII/regulated data.',
+      hasPayment?'SB required around PSP/token vault and PCI-scoped paths.':'Payment boundary not detected in this workload.',
+      hasSftp?'SFTP feeds require SSH, key rotation, landing-zone scanning, and reconciliation evidence.':'Batch/SFTP feed not detected.',
+      'T required on every inter-service and external integration flow.',
+      'R2/R3 required before tokenization or masking is treated as sufficient.'
+    ],
+    network:[
+      [cloud,'Primary cloud landing zone'],
+      [hasOnPrem?'On-Prem DC':'External/SaaS','Legacy, SaaS, partner, or data-center systems'],
+      ['Third Party','PSP, carrier, CRM, identity, observability, or AI provider']
+    ],
+    status:[
+      ['Existing','Component unchanged from current estate.'],
+      ['Updated','Existing component changed or hardened.'],
+      ['New','New component introduced by target architecture.'],
+      ['Supported','Dependency visible but outside direct build scope.']
+    ]
+  };
+}
+
+function buildArchitectureAnnotationLegend(facts){
+  const model=buildArchitectureAnnotationModel(facts);
+  const annotationRows=model.annotations.map(([code,desc])=>`<div class="annotation-row"><span class="annotation-code">${escapeHtml(code)}</span><span>${escapeHtml(desc)}</span></div>`).join('');
+  const activeRows=model.active.map(item=>`<li>${escapeHtml(item)}</li>`).join('');
+  const networkRows=model.network.map(([name,desc],index)=>`<div class="network-legend-row"><span class="network-swatch swatch-${index+1}"></span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(desc)}</span></div></div>`).join('');
+  const statusRows=model.status.map(([name,desc],index)=>`<div class="status-legend-row"><span class="status-swatch status-${index+1}"></span><div><strong>${escapeHtml(name)}</strong><span>${escapeHtml(desc)}</span></div></div>`).join('');
+  return `<div class="architecture-side-section architecture-annotation-section"><div class="architecture-side-heading">Security annotations</div><div class="annotation-grid">${annotationRows}</div><div class="annotation-active"><div class="architecture-side-title">Expected controls in this view</div><ul>${activeRows}</ul></div></div><div class="architecture-side-section"><div class="architecture-side-heading">Network legend</div><div class="network-legend">${networkRows}</div></div><div class="architecture-side-section"><div class="architecture-side-heading">Component status</div><div class="status-legend">${statusRows}</div></div>`;
+}
+
+function annotationTagsForNode(nodeId,label,facts){
+  const text=`${nodeId||''} ${label||''}`.toLowerCase();
+  if(/\[(?:a1|a2|ca1|ca2|r2|r3|t|c3|c5|c5e|sb|tb)/i.test(label)) return '';
+  if(/psp|payment|token|pci|pan|sad|vault|card/.test(text)) return 'SB,C5E,T,R2,A1';
+  if(/customer|consent|pii|privacy|loyalty|profile|support|crm|rag|chatbot/.test(text)) return 'C5E,T,R2,A1';
+  if(/waf|cdn|gateway|edge|firewall|bot|ingress|proxy/.test(text)) return 'SB,T,A1';
+  if(/secret|kms|hsm|pki|certificate|identity|auth|oidc|mfa|iam/.test(text)) return 'A1,CA1,R2,T';
+  if(/database|ledger|order|audit|reservation|inventory|event|queue|stream|dlq|schema|store|lakehouse|warehouse/.test(text)) return 'C3,R2,T';
+  if(/erp|oms|wms|carrier|external|saas|partner|supplier/.test(text)) return 'TB,T,A2';
+  if(/ai|model|recommend|ranking|llm|gemini|openai|bedrock|claude/.test(text)) return facts?.hasRetailAiPath?'C5E,T,A1':'T,A1';
+  if(/user|shopper|associate|employee|admin|ops|merchant|merch/.test(text)) return 'CA1,T';
+  return 'T';
+}
+
+function annotateDiagramNodeLabels(code,facts){
+  return String(code||'').replace(/([A-Za-z_][A-Za-z0-9_]*)\["([^"]+)"\]/g,(match,nodeId,label)=>{
+    if(/^subgraph$/i.test(nodeId)) return match;
+    const tags=annotationTagsForNode(nodeId,label,facts);
+    if(!tags) return match;
+    const compact=label.length>58?`${label.slice(0,55)}...`:label;
+    return `${nodeId}["${compact}\\n[${tags}]"]`;
+  });
+}
+
+function annotateDiagramGroups(code){
+  const replacements=[
+    [/subgraph\s+edge\["([^"]+)"\]/g,'subgraph edge["$1 | Cloud/edge zone | SB,T"]'],
+    [/subgraph\s+commit\["([^"]+)"\]/g,'subgraph commit["$1 | Updated critical zone | C5E,R2,T"]'],
+    [/subgraph\s+commerce\["([^"]+)"\]/g,'subgraph commerce["$1 | Updated runtime zone | T,A1"]'],
+    [/subgraph\s+data\["([^"]+)"\]/g,'subgraph data["$1 | Data trust zone | R2/R3,C3/C5"]'],
+    [/subgraph\s+external\["([^"]+)"\]/g,'subgraph external["$1 | External/SaaS zone | TB,T,A2"]'],
+    [/subgraph\s+integrations\["([^"]+)"\]/g,'subgraph integrations["$1 | External/SaaS zone | TB,T,A2"]'],
+    [/subgraph\s+merchandising\["([^"]+)"\]/g,'subgraph merchandising["$1 | Updated decision zone | T,A1"]']
+  ];
+  return replacements.reduce((out,[pattern,replacement])=>out.replace(pattern,replacement),String(code||''));
+}
+
+function architectureCanvasLegendCode(){
+  return `
+  subgraph annotationLegend["Annotation legend"]
+    annAuth["A1 secrets | CA1 MFA/step-up"]
+    annCrypto["T transit | R2/R3 at-rest | C5E app/field encryption"]
+    annBoundary["SB security boundary | TB trust boundary"]
+  end
+  subgraph networkLegend["Network legend"]
+    netCloud["Cloud zone"]
+    netExternal["External/SaaS"]
+    netThird["Third party"]
+  end
+  subgraph statusLegend["Component status"]
+    stExisting["Existing"]
+    stUpdated["Updated"]
+    stNew["New"]
+    stSupported["Supported"]
+  end`;
+}
+
+function embedArchitectureDiagramAnnotations(code,facts){
+  const source=String(code||'');
+  if(!/^flowchart\b/m.test(source)||source.includes('subgraph annotationLegend')) return source;
+  const annotated=annotateDiagramGroups(annotateDiagramNodeLabels(source,facts));
+  return `${annotated}${architectureCanvasLegendCode()}`;
+}
+
 function getArchitectureSignals(facts){
   const common=[
     {
@@ -3237,12 +3390,16 @@ function buildArchitectureViews(result){
   response --> customer
   api --> handoff["Async work and human handoff"]
   handoff --> integration["${escapeMermaidLabel(facts.hasSalesforce?'Salesforce CRM':'External systems')}"]`:retailDiagrams.requestFlowCode;
+  const annotatedContextCode=embedArchitectureDiagramAnnotations(systemContextCode,facts);
+  const annotatedSolutionCode=embedArchitectureDiagramAnnotations(solutionVisual||solutionCode,facts);
+  const annotatedDeploymentCode=embedArchitectureDiagramAnnotations(deploymentCode,facts);
+  const annotatedRequestFlowCode=embedArchitectureDiagramAnnotations(requestFlowCode,facts);
   return {
     context:{
       title:'System context',
       subtitle:'Who interacts with the platform and which external capabilities it depends on.',
-      visual:systemContextCode,
-      code:systemContextCode,
+      visual:annotatedContextCode,
+      code:annotatedContextCode,
       source:'Context view synthesized from the recommendation.',
       summary:facts.isAiScenario?'This view shows the platform boundary and the main external dependencies that shape the design.':retailDiagrams.summary,
       notes:facts.isAiScenario?[
@@ -3254,8 +3411,8 @@ function buildArchitectureViews(result){
     solution:{
       title:'Solution architecture',
       subtitle:facts.isAiScenario?'Logical service layout across edge, application, AI, data, integrations, and ops.':`Logical service layout for ${facts.workload}.`,
-      visual:solutionVisual||solutionCode,
-      code:solutionCode,
+      visual:annotatedSolutionCode,
+      code:annotatedSolutionCode,
       source:'Logical architecture synthesized from the recommendation stack.',
       summary:'This is the primary solution view and is closest to what a solution architect would review with engineering leads.',
       notes:facts.isAiScenario?[
@@ -3267,8 +3424,8 @@ function buildArchitectureViews(result){
     deployment:{
       title:'Deployment architecture',
       subtitle:'Where the services land and how runtime, data, and ops controls are separated by environment.',
-      visual:deploymentCode,
-      code:deploymentCode,
+      visual:annotatedDeploymentCode,
+      code:annotatedDeploymentCode,
       source:'Deployment view synthesized from region and stack recommendations.',
       summary:'This view focuses on infrastructure placement, regional boundaries, and managed-service separation.',
       notes:facts.isAiScenario?[
@@ -3280,8 +3437,8 @@ function buildArchitectureViews(result){
     request:{
       title:'Key request flow',
       subtitle:facts.isAiScenario?'How a customer request moves through the system, retrieval path, model call, and handoff.':retailDiagrams.requestSubtitle,
-      visual:requestFlowCode,
-      code:requestFlowCode,
+      visual:annotatedRequestFlowCode,
+      code:annotatedRequestFlowCode,
       source:'Request flow synthesized from the recommended pipeline.',
       summary:facts.isAiScenario?'This workflow view is intended for product, support, and implementation teams validating the main path.':'This workflow view is intended for retail operations, support, and implementation teams validating the offline checkout path.',
       notes:facts.isAiScenario?[
@@ -3840,8 +3997,10 @@ RETAIL DOMAIN VALIDATION:
 - Check POS/e-commerce/ERP/OMS/WMS integration ownership, idempotency keys, retries, dead letters, replay, reconciliation, duplicate handling, and manual correction.
 - If stores/POS/offline trading are in scope, require edge HA/failure behavior, offline auth/payment boundaries, queue durability, ordering, replay/idempotency tests, conflict policy, reconnect criteria, and field runbooks.
 - If payments/PCI are in scope, require PCI scope boundary, segmentation evidence, raw PAN/SAD exclusion or explicit scope, tokenization/P2PE boundary, logging controls, and QSA/human validation.
-- If customer/loyalty data is in scope, require consent, tokenization or pseudonymization, retention, deletion/DSAR handling, regional ownership, support access controls, and analytics minimization.
+- If customer/loyalty data is in scope, require encryption before tokenization/masking: data classification, TLS/SSH in transit, KMS/HSM/CMEK/CSEK at rest, field/app-layer encryption where needed, secret-manager credential storage, key rotation ownership, consent, tokenization or pseudonymization, retention, deletion/DSAR, regional ownership, support access controls, log redaction, and analytics minimization.
 - Check pilot rollout gates, rollback triggers, owner roles, game days, and measurable acceptance criteria.
+- Check FinOps maturity: service-level pricing evidence, unit drivers, reserved/committed spend assumptions, non-prod parity, egress/IOPS/log-retention cost, support/licensing/partner cost, contingency, and named FinOps owner.
+- Check scaling maturity: autoscaling signal, connection pooling, cache strategy, rate limits/quotas, backpressure, queue lag SLOs, first bottleneck, degraded mode, and peak-load acceptance test.
 - Flag generic retail recommendations that do not prove operational correctness under campaign peaks, store outage, replay backlog, or data residency constraints.
 `:''; 
   const isAgentic=isAgenticDomain(retailText);
@@ -4002,6 +4161,18 @@ function applyDeterministicValidationGates(validation,result,state,research,pric
     const hasServicePricing=(pricing?.usablePricePoints||[]).length>0;
     if(!hasServicePricing){
       v.warnings=addUniqueValidationItem(v.warnings,'Retail pricing should remain marked as partial or assumption unless service-level pricing is available for the named commerce, data, network, security, observability, and edge components.');
+    }
+    if(!/finops|unit cost|cost driver|reserved|committed|savings plan|right.?siz|egress|iops|retention|non.?prod|licen[sc]|support plan|contingency|budget guardrail/i.test(outputText)){
+      v.warnings=addUniqueValidationItem(v.warnings,'FinOps detail is insufficient; add unit-cost drivers, service-level SKU evidence, non-prod parity, egress/IOPS/log-retention cost, support/licensing/partner cost, contingency, and named FinOps owner validation.');
+    }
+    if(!/autoscal|keda|queue lag|consumer lag|connection pool|pgbouncer|backpressure|rate limit|quota|cache hit|load test|stress test|peak test|degraded mode|circuit breaker|bulkhead/i.test(outputText)){
+      v.warnings=addUniqueValidationItem(v.warnings,'Scaling detail is insufficient; add autoscaling signals, bottleneck assumptions, connection pooling, cache strategy, backpressure, queue lag SLOs, quotas/rate limits, degraded modes, and peak-load acceptance criteria.');
+    }
+    if(!/encrypt|tls|ssh|kms|hsm|cmek|csek|aes|pgp|key rotation|secret manager|at rest|in transit|field.?level|app.?layer/i.test(outputText)){
+      v.warnings=addUniqueValidationItem(v.warnings,'Security detail is insufficient; tokenization/masking is not enough without explicit encryption in transit, encryption at rest, key ownership/rotation, secret-manager use, and log redaction.');
+    }
+    if(!/trust boundary|security boundary|segmentation|firewall|waf|ips|pci scope|psp boundary|network zone|private subnet|egress/i.test(outputText)){
+      v.warnings=addUniqueValidationItem(v.warnings,'Diagram/security detail should show trust boundaries, external security boundaries, provider/network zones, and PCI/privacy segmentation evidence.');
     }
     if(research?.research_confidence==='low'){
       v.warnings=addUniqueValidationItem(v.warnings,'Research confidence is low; treat company profile and scale as user-provided or inferred until validated with the retail client.');
@@ -4627,10 +4798,11 @@ function buildTierSection(activeTier){
   const architectureSignals=getArchitectureSignals(architectureFacts).map(signal=>`<div class="architecture-insight ${signal.tone}"><div class="architecture-insight-label">${escapeHtml(signal.label)}</div><div class="architecture-insight-value">${escapeHtml(signal.value)}</div><div class="architecture-insight-note">${escapeHtml(signal.note)}</div></div>`).join('');
   const architectureViewCards=Object.entries(architectureViews).map(([key,view])=>{const summary=summarizeArchitectureDiagram(view.code);return `<button type="button" class="architecture-view-card ${ARCHITECTURE_UI.panel===key?'active':''}" onclick="setArchitecturePanel('${key}')"><div class="architecture-view-card-head"><div class="architecture-view-title">${escapeHtml(view.title)}</div><span class="architecture-view-status">${ARCHITECTURE_UI.panel===key?'Active':'View'}</span></div><div class="architecture-view-copy">${escapeHtml(view.subtitle)}</div><div class="architecture-view-meta"><span>${summary.serviceCount} services</span><span>${summary.edgeCount} flows</span></div></button>`;}).join('');
   const architectureLegend=architectureView.notes.map(note=>`<div class="architecture-legend-row"><span class="architecture-legend-dot"></span><span>${escapeHtml(note)}</span></div>`).join('');
+  const annotationLegend=buildArchitectureAnnotationLegend(architectureFacts);
   const architectureShowDiagram=ARCHITECTURE_UI.display!=='code';
   const architectureShowCode=ARCHITECTURE_UI.display!=='diagram';
   const architectureStageClass=`architecture-stage${ARCHITECTURE_UI.display==='split'?' split':''}`;
-  const architectureSection=`<div class="card architecture-card"><div class="architecture-hero"><div><div class="architecture-kicker">Diagram Studio  -  ${escapeHtml(activeTier.label)}</div><div class="architecture-title">${escapeHtml(architectureView.title)}</div><div class="architecture-subtitle">${escapeHtml(architectureView.source)}</div></div><div class="architecture-toolbar"><span class="arch-pill">${escapeHtml(architectureDisplayLabel)}</span><button class="btn" onclick="copyArchitectureCode()">Copy Python</button></div></div><div class="architecture-view-grid">${architectureViewCards}</div><div class="architecture-metrics"><div class="architecture-metric"><div class="architecture-metric-label">Groups</div><div class="architecture-metric-value">${architectureSummary.groupCount}</div></div><div class="architecture-metric"><div class="architecture-metric-label">Services</div><div class="architecture-metric-value">${architectureSummary.serviceCount}</div></div><div class="architecture-metric"><div class="architecture-metric-label">Flows</div><div class="architecture-metric-value">${architectureSummary.edgeCount}</div></div><div class="architecture-metric"><div class="architecture-metric-label">Tier</div><div class="architecture-metric-value" style="font-size:13px">${escapeHtml(activeTier.label)}</div></div></div><div class="architecture-insight-grid">${architectureSignals}</div><div class="architecture-layout"><div class="architecture-main"><div class="architecture-main-tools"><div class="architecture-segments"><button class="architecture-segment ${ARCHITECTURE_UI.display==='diagram'?'active':''}" onclick="setArchitectureDisplay('diagram')">Diagram</button><button class="architecture-segment ${ARCHITECTURE_UI.display==='split'?'active':''}" onclick="setArchitectureDisplay('split')">Split</button><button class="architecture-segment ${ARCHITECTURE_UI.display==='code'?'active':''}" onclick="setArchitectureDisplay('code')">Code</button></div><div class="architecture-stage-note">${escapeHtml(architectureDisplayNote)}</div></div><div class="${architectureStageClass}"><div class="diagram-wrap" style="display:${architectureShowDiagram?'block':'none'}"><div class="architecture-stage-top"><div><div class="architecture-stage-label">Rendered canvas</div><div class="architecture-stage-caption">Server-rendered SVG output generated by the Python diagrams renderer.</div></div><div class="architecture-stage-badge">Live render</div></div><div class="mermaid" id="architecture-mermaid"></div></div><div class="architecture-code-panel" style="display:${architectureShowCode?'block':'none'}"><div class="architecture-stage-top"><div><div class="architecture-stage-label">Python source</div><div class="architecture-stage-caption">Underlying Python diagrams source for export and renderer iteration.</div></div><div class="architecture-stage-badge">Source</div></div><div class="architecture-code-actions"><button class="btn" onclick="copyArchitectureCode()">Copy Python</button></div><pre class="diagram-code" id="architecture-code"></pre></div></div></div><aside class="architecture-side"><div class="architecture-side-section"><div class="architecture-side-heading">View brief</div><div class="architecture-side-title">${escapeHtml(architectureView.subtitle)}</div><div class="architecture-side-copy">${escapeHtml(architectureView.summary)}</div></div><div class="architecture-side-section"><div class="architecture-side-heading">Topology signals</div><div class="architecture-group-list">${architectureGroups}</div></div><div class="architecture-side-section"><div class="architecture-side-heading">Reading guide</div><div class="architecture-legend">${architectureLegend}</div></div></aside></div></div>`;
+  const architectureSection=`<div class="card architecture-card"><div class="architecture-hero"><div><div class="architecture-kicker">Diagram Studio  -  ${escapeHtml(activeTier.label)}</div><div class="architecture-title">${escapeHtml(architectureView.title)}</div><div class="architecture-subtitle">${escapeHtml(architectureView.source)}</div></div><div class="architecture-toolbar"><span class="arch-pill">${escapeHtml(architectureDisplayLabel)}</span><button class="btn" onclick="copyArchitectureCode()">Copy Python</button></div></div><div class="architecture-view-grid">${architectureViewCards}</div><div class="architecture-metrics"><div class="architecture-metric"><div class="architecture-metric-label">Groups</div><div class="architecture-metric-value">${architectureSummary.groupCount}</div></div><div class="architecture-metric"><div class="architecture-metric-label">Services</div><div class="architecture-metric-value">${architectureSummary.serviceCount}</div></div><div class="architecture-metric"><div class="architecture-metric-label">Flows</div><div class="architecture-metric-value">${architectureSummary.edgeCount}</div></div><div class="architecture-metric"><div class="architecture-metric-label">Tier</div><div class="architecture-metric-value" style="font-size:13px">${escapeHtml(activeTier.label)}</div></div></div><div class="architecture-insight-grid">${architectureSignals}</div><div class="architecture-layout"><div class="architecture-main"><div class="architecture-main-tools"><div class="architecture-segments"><button class="architecture-segment ${ARCHITECTURE_UI.display==='diagram'?'active':''}" onclick="setArchitectureDisplay('diagram')">Diagram</button><button class="architecture-segment ${ARCHITECTURE_UI.display==='split'?'active':''}" onclick="setArchitectureDisplay('split')">Split</button><button class="architecture-segment ${ARCHITECTURE_UI.display==='code'?'active':''}" onclick="setArchitectureDisplay('code')">Code</button></div><div class="architecture-stage-note">${escapeHtml(architectureDisplayNote)}</div></div><div class="${architectureStageClass}"><div class="diagram-wrap" style="display:${architectureShowDiagram?'block':'none'}"><div class="architecture-stage-top"><div><div class="architecture-stage-label">Rendered canvas</div><div class="architecture-stage-caption">Server-rendered SVG output generated by the Python diagrams renderer.</div></div><div class="architecture-stage-badge">Live render</div></div><div class="mermaid" id="architecture-mermaid"></div></div><div class="architecture-code-panel" style="display:${architectureShowCode?'block':'none'}"><div class="architecture-stage-top"><div><div class="architecture-stage-label">Python source</div><div class="architecture-stage-caption">Underlying Python diagrams source for export and renderer iteration.</div></div><div class="architecture-stage-badge">Source</div></div><div class="architecture-code-actions"><button class="btn" onclick="copyArchitectureCode()">Copy Python</button></div><pre class="diagram-code" id="architecture-code"></pre></div></div></div><aside class="architecture-side"><div class="architecture-side-section"><div class="architecture-side-heading">View brief</div><div class="architecture-side-title">${escapeHtml(architectureView.subtitle)}</div><div class="architecture-side-copy">${escapeHtml(architectureView.summary)}</div></div><div class="architecture-side-section"><div class="architecture-side-heading">Topology signals</div><div class="architecture-group-list">${architectureGroups}</div></div><div class="architecture-side-section"><div class="architecture-side-heading">Reading guide</div><div class="architecture-legend">${architectureLegend}</div></div>${annotationLegend}</aside></div></div>`;
   // Store the view+facts on window so renderArchitectureDiagram can be called after innerHTML
   window.__activeTierViews={architectureView,architectureFacts};
   return {stackRows,breakdown,architectureSection};

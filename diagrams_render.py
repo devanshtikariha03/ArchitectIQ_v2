@@ -435,6 +435,43 @@ def class_for_node(node):
     return detect_node_class(node.get("kind", "service"), node.get("label", "Service"))
 
 
+def cluster_graph_attr(label):
+    text = str(label or "").lower()
+    base = {
+        "style": "rounded,filled",
+        "penwidth": "1.4",
+        "fontname": "Inter",
+        "fontsize": "12",
+        "margin": "14",
+    }
+    if "annotation legend" in text:
+        return {**base, "bgcolor": "#F4F6F8", "color": "#8B98A8", "fontcolor": "#334155"}
+    if "network legend" in text:
+        return {**base, "bgcolor": "#EEF6FF", "color": "#4F8EFF", "fontcolor": "#1E3A8A"}
+    if "component status" in text:
+        return {**base, "bgcolor": "#F8F7EE", "color": "#B28A00", "fontcolor": "#5F4B00"}
+    if "external" in text or "saas" in text or "third" in text or "partner" in text:
+        return {**base, "bgcolor": "#F2EAF7", "color": "#9B7BB8", "fontcolor": "#4A2B63"}
+    if "on-prem" in text or "legacy" in text or "erp" in text:
+        return {**base, "bgcolor": "#F5E8C8", "color": "#B8892E", "fontcolor": "#5B3D08"}
+    if "data" in text or "ledger" in text or "audit" in text or "privacy" in text:
+        return {**base, "bgcolor": "#EAF7EA", "color": "#5D9B59", "fontcolor": "#1F5F2B"}
+    if "security" in text or "pci" in text or "trust" in text:
+        return {**base, "bgcolor": "#FFF1F2", "color": "#D46A7C", "fontcolor": "#7F1D1D"}
+    if "cloud" in text or "edge" in text or "region" in text or "runtime" in text:
+        return {**base, "bgcolor": "#EAF6FB", "color": "#4AA3C7", "fontcolor": "#164E63"}
+    if "critical" in text or "commit" in text or "checkout" in text:
+        return {**base, "bgcolor": "#FFF7D6", "color": "#C89B18", "fontcolor": "#6B4E00"}
+    return {**base, "bgcolor": "#F8FAFC", "color": "#CBD5E1", "fontcolor": "#334155"}
+
+
+def cluster_context(label):
+    try:
+        return Cluster(label, graph_attr=cluster_graph_attr(label))
+    except TypeError:
+        return Cluster(label)
+
+
 def generate_dynamic_source(payload, graph):
     title = safe_text(payload.get("title"), "architectiq-diagram")
     panel = payload.get("panel", "solution")
@@ -454,7 +491,7 @@ def generate_dynamic_source(payload, graph):
         members = grouped.get(group["id"], [])
         if not members:
             continue
-        lines.append(f"    with Cluster({py_string(group['label'])}):")
+        lines.append(f"    with Cluster({py_string(group['label'])}, graph_attr={repr(cluster_graph_attr(group['label']))}):")
         for node in members:
             cls = class_for_node(node)
             var = py_var(node["id"])
@@ -471,7 +508,7 @@ def generate_dynamic_source(payload, graph):
         cls = class_for_node(node)
         var = py_var(node["id"])
         group_label = group_labels.get(node.get("group", ""), node.get("group", "Ungrouped"))
-        lines.append(f"    with Cluster({py_string(group_label)}):")
+        lines.append(f"    with Cluster({py_string(group_label)}, graph_attr={repr(cluster_graph_attr(group_label))}):")
         lines.append(f"        {var} = {cls.__name__}({py_string(node['label'])})")
     for left, right in graph.get("edges", []):
         if left in graph["nodes"] and right in graph["nodes"]:
@@ -518,7 +555,7 @@ def render_dynamic_panel(payload, graph):
                 members = grouped.get(group["id"], [])
                 if not members:
                     continue
-                with Cluster(group["label"]):
+                with cluster_context(group["label"]):
                     for node in members:
                         rendered_nodes[node["id"]] = class_for_node(node)(safe_text(node["label"], "Service"))
             for node in grouped.get("", []):
