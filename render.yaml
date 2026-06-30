@@ -1,0 +1,13 @@
+services:
+  - type: web
+    name: architectiq-retail
+    env: docker
+    dockerfilePath: ./Dockerfile
+    autoDeploy: true
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PYTHON_BIN
+        value: python3
+      - key: LLM_PRIMARY
+        value: openai

@@ -1,4 +1,8 @@
 node_modules/
+landing/node_modules/
+landing/dist/
+landing/vite-dev.log
+server-dev.log
 logs/
 .env
 *.backup.html
