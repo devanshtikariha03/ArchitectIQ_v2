@@ -1626,8 +1626,7 @@ function serverStatusMarkup(){
     return `<div class="err-box" style="margin-top:10px"><strong>Cannot reach the ArchitectIQ API server.</strong> Open the app through the Node server at http://localhost:3000, not the Vite-only port or a file URL. Details: ${escapeHtml(SERVER_CONFIG.error)}</div>`;
   }
   if(SERVER_CONFIG.loaded&&SERVER_CONFIG.keyConfigured){
-    const provider=SERVER_CONFIG.anthropicKeyConfigured?'Claude':SERVER_CONFIG.openaiKeyConfigured?'OpenAI':'LLM';
-    return `<div class="layer-why" style="margin-top:10px">Live generation ready via ${provider}. Mock preview remains available for offline testing.</div>`;
+    return `<div class="layer-why" style="margin-top:10px">Architecture agents are ready.</div>`;
   }
   return `<div class="layer-why" style="margin-top:10px">Live generation uses the local ArchitectIQ API server. Mock preview uses a local sample response.</div>`;
 }
@@ -4575,7 +4574,7 @@ async function generate(){
   logEvent('info','playbook.retrieved',{rules:retrievedPlaybookRules.map(rule=>rule.id)});
 
   // -- Phase 5: Generate ---
-  setPipelineStage('generate','run','Calling gpt-5.4 with retrieved architect playbook...');
+  setPipelineStage('generate','run','Architecture agents are working together through the retrieved architect playbook...');
 
   const costSummary=CL.map(([key,label])=>`${label}: ${S.cost[key]||'not specified'}`).join(' | ');
   const nfrSummary=NF.map(([key])=>`${key}: ${S.nfr[key]||'not specified'}`).join('\n');
@@ -4626,7 +4625,7 @@ OUTPUT AUDIENCE: ${AUDIENCE_VIEW==='executive'?'Executive / non-technical stakeh
 Return only the JSON object. Do not wrap it in markdown.`;
 
   try{
-    logEvent('info','generation.started',{company:b.company,model:'gpt-5.4',hasResearch:!!LAST_RESEARCH,hasPricing:!!(LAST_PRICING_CONTEXT?.usablePricePoints?.length),contradictions:contradictions.length});
+    logEvent('info','generation.started',{company:b.company,orchestration:'architecture-agents',hasResearch:!!LAST_RESEARCH,hasPricing:!!(LAST_PRICING_CONTEXT?.usablePricePoints?.length),contradictions:contradictions.length});
     let result=null;
     let generationFailure=null;
     for(let attempt=1;attempt<=2;attempt++){
