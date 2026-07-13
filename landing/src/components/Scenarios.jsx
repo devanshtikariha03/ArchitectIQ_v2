@@ -18,7 +18,7 @@ function useReveal(ref, delay = 0) {
     }, { threshold: 0.06 })
     obs.observe(el)
     return () => obs.disconnect()
-  }, [])
+  }, [ref, delay])
 }
 
 function ScenarioCard({ s, index }) {
@@ -26,11 +26,11 @@ function ScenarioCard({ s, index }) {
   useReveal(ref, index * 40)
 
   return (
-    <a ref={ref} href="/app" className="reveal" style={{ textDecoration: 'none', display: 'block' }}>
+    <article ref={ref} className="reveal" style={{ display: 'block' }}>
       <div className="glass" style={{
         padding: '22px', height: '100%',
         transition: 'border-color 0.2s, transform 0.2s, box-shadow 0.2s',
-        cursor: 'pointer',
+        cursor: 'default',
       }}
         onMouseEnter={e => {
           e.currentTarget.style.borderColor = `${s.color}40`
@@ -51,9 +51,9 @@ function ScenarioCard({ s, index }) {
           }}>{s.tag}</span>
         </div>
         <p style={{ fontSize: 13.5, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>{s.desc}</p>
-        <div style={{ fontSize: 12.5, color: s.color, fontWeight: 600, opacity: 0.8 }}>Load scenario -&gt;</div>
+        <div style={{ fontSize: 12.5, color: s.color, fontWeight: 600, opacity: 0.8 }}>ArchitectIQ use case</div>
       </div>
-    </a>
+    </article>
   )
 }
 

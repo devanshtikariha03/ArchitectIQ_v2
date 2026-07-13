@@ -60,8 +60,8 @@ export default function Nav() {
           ))}
         </div>
 
-        <a href="/app" className="btn-primary" style={{ padding: '9px 20px', fontSize: 13.5 }}>
-          Open app -&gt;
+        <a href="#about" className="btn-primary" style={{ padding: '9px 20px', fontSize: 13.5 }}>
+          Meet the founders
         </a>
       </nav>
     </header>

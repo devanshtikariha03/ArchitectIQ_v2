@@ -166,8 +166,8 @@ export default function Hero() {
 
             {/* CTAs */}
             <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', marginBottom: 52 }}>
-              <a href="/app" className="btn-primary" style={{ fontSize: 15, padding: '14px 28px' }}>
-                Generate architecture
+              <a href="#how-it-works" className="btn-primary" style={{ fontSize: 15, padding: '14px 28px' }}>
+                Explore ArchitectIQ
                 <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
               </a>
               <a href="#output" className="btn-ghost" style={{ fontSize: 15, padding: '14px 28px' }}>

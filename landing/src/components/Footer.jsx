@@ -25,8 +25,7 @@ export default function Footer() {
             fontWeight: 900, letterSpacing: '-2.5px',
             color: 'var(--text)', lineHeight: 1.08,
           }}>
-            Ready to generate<br />
-            your next<br />
+            Built for better<br />
             <span style={{
               background: 'linear-gradient(135deg, #E8472A, #FF6B35, #FBBF24)',
               WebkitBackgroundClip: 'text',
@@ -36,16 +35,16 @@ export default function Footer() {
           </h2>
 
           <p style={{ fontSize: 17, color: 'var(--muted)', maxWidth: 400 }}>
-            No account. No credit card.<br />Fill the form, get the full output.
+            Meet the people building a faster, more rigorous way<br />to turn retail requirements into architecture decisions.
           </p>
 
-          <a href="/app" className="btn-primary" style={{ fontSize: 16, padding: '16px 40px', marginTop: 8 }}>
-            Generate architecture
+          <a href="#about" className="btn-primary" style={{ fontSize: 16, padding: '16px 40px', marginTop: 8 }}>
+            Meet the cofounders
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </a>
 
           <p style={{ fontSize: 12, color: 'var(--subtle)' }}>
-            Uses live Azure - AWS - GCP pricing APIs
+            ArchitectIQ is currently being developed and tested.
           </p>
         </div>
       </section>
@@ -63,7 +62,7 @@ export default function Footer() {
           </div>
 
           <div style={{ display: 'flex', gap: 20 }}>
-            {[['#how-it-works','How it works'],['#output','Output'],['#scenarios','Scenarios'],'/app,Launch App'].map((item, i) => {
+            {[['#how-it-works','How it works'],['#output','Output'],['#scenarios','Scenarios'],['#about','About us']].map((item, i) => {
               const [href, label] = Array.isArray(item) ? item : item.split(',')
               return (
                 <a key={i} href={href} style={{ fontSize: 13, color: 'var(--muted)', textDecoration: 'none', transition: 'color 0.15s' }}
