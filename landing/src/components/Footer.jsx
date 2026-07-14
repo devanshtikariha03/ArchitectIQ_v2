@@ -39,7 +39,7 @@ export default function Footer() {
           </p>
 
           <a href="#about" className="btn-primary" style={{ fontSize: 16, padding: '16px 40px', marginTop: 8 }}>
-            Meet the cofounders
+            About us
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none"><path d="M1 7h12M7 1l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round"/></svg>
           </a>
 

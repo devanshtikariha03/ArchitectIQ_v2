@@ -6,13 +6,15 @@ const FOUNDERS = [
     initials: 'DT',
     image: '/devansh-tikariha.png',
     linkedin: 'https://www.linkedin.com/in/devanshtikariha',
-    description: 'Devansh Tikariha is an AI engineer and data science professional with hands-on experience building machine learning systems across healthcare, financial automation, and education technology. His expertise spans deep learning, computer vision, large language models, retrieval-augmented generation, and scalable AI deployment using containers and Kubernetes on Microsoft Azure. He has developed quantum-enhanced diagnostic models for medical imaging, adversarial attack detection for CT scans, AI-driven debt collection workflows handling tens of thousands of calls, and personalized learning tools for exam preparation. Devansh has co-authored peer-reviewed IEEE publications and is an inventor on a patented smart solar-powered safety helmet for continuous communication and safety monitoring. He is currently pursuing a Master of Data Science at the University of Western Australia.',
+    description: 'Devansh Tikariha is an AI engineer and data science professional with hands-on experience building machine learning systems across healthcare, financial automation, and education technology. His expertise spans deep learning, computer vision, large language models, retrieval-augmented generation, and scalable AI deployment with practical experience across Microsoft Azure services. He has developed quantum-enhanced diagnostic models for medical imaging, adversarial attack detection for CT scans, AI-driven debt collection workflows handling tens of thousands of calls, and personalized learning tools for exam preparation. Devansh has co-authored peer-reviewed IEEE publications and is an inventor on a patented smart solar-powered safety helmet for continuous communication and safety monitoring. He is currently pursuing a Master of Data Science at the University of Western Australia.',
     accent: '#E8472A',
   },
   {
-    name: 'Krishna Chaiatanya',
+    name: 'Krishna Chaitanya',
     initials: 'KC',
-    description: 'Cofounder of ArchitectIQ, helping shape the product and the systems that turn complex retail requirements into clear, actionable architecture.',
+    image: '/krishna-chaitanya.png',
+    linkedin: 'https://www.linkedin.com/in/krishnachaitanya24?utm_source=share_via&utm_content=profile&utm_medium=member_android',
+    description: 'Krishna Chaitanya is a Data Scientist and Technical Operations professional with a Bachelor’s in Computer Science Engineering, specializing in AI and machine learning, and is pursuing a Master of Data Science at the University of Western Australia. He combines advanced analytics, institutional compliance, and technical operations across education, technology, and community services. His experience includes a Generative AI internship at Capgemini, where he worked on machine learning architectures, neural networks, predictive algorithms, and retrieval-augmented systems. Krishna has developed data-driven NDIS workflows using Deputy and QuickBooks, supported lifecycle maintenance planning for an 80-vehicle fleet, managed institutional data integrity at KCBT, built automated ETL pipelines and business intelligence structures, and resolved Level 1 and Level 2 IT infrastructure challenges.',
     accent: '#2563EB',
   },
 ]

@@ -61,7 +61,7 @@ export default function Nav() {
         </div>
 
         <a href="#about" className="btn-primary" style={{ padding: '9px 20px', fontSize: 13.5 }}>
-          Meet the founders
+          About us
         </a>
       </nav>
     </header>
