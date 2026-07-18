@@ -1639,7 +1639,178 @@ function rGen(){
     ['Non-functional reqs',Object.values(S.nfr).some(Boolean)],
     ['Team & delivery',!!S.team.size&&!!S.team.timeline]
   ];
-  return `${progressStrip()}<div class="gen-card"><div class="gen-icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" fill="none" stroke="#185FA5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="gen-title">${escapeHtml(S.basics.company||'ArchitectIQ')} - ready to generate</div><div class="gen-sub">All sections are loaded. The recommendation will include your full stack, 3-tier cost estimate, risk register, decision rationale, and a phased implementation roadmap.</div><div class="checklist">${checks.map(([label,ok])=>`<div class="check-item"><div class="${ok?'check-tick':'check-miss'}">${ok?'OK':''}</div><span>${label}</span></div>`).join('')}</div><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-generate" onclick="generate()">Generate architecture recommendation -></button><button class="btn" onclick="runMockRecommendation()">Preview mock recommendation</button></div>${serverStatusMarkup()}</div><div id="out" style="margin-top:1rem"></div>`;
+  return `${progressStrip()}<div class="gen-card"><div class="gen-icon"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5" fill="none" stroke="#185FA5" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="gen-title">${escapeHtml(S.basics.company||'ArchitectIQ')} - ready to generate</div><div class="gen-sub">All sections are loaded. The recommendation will include your full stack, 3-tier cost estimate, risk register, decision rationale, and a phased implementation roadmap.</div><div class="checklist">${checks.map(([label,ok])=>`<div class="check-item"><div class="${ok?'check-tick':'check-miss'}">${ok?'OK':''}</div><span>${label}</span></div>`).join('')}</div><div style="display:flex;gap:10px;flex-wrap:wrap"><button class="btn-generate" onclick="generate()">Generate architecture recommendation -></button><button class="btn" onclick="runAgentReview()">Run agent review</button><button class="btn" onclick="runMockRecommendation()">Preview mock recommendation</button></div>${serverStatusMarkup()}</div><div id="out" style="margin-top:1rem"></div>`;
+}
+
+function agentList(items){
+  return (items||[]).slice(0,8).map(item=>`<div class="validation-item">${escapeHtml(typeof item==='string'?item:item?.risk||item?.topic||JSON.stringify(item))}</div>`).join('')||'<div class="validation-item">None returned</div>';
+}
+
+function customerAgentRecommendation(agent){
+  const seen=new Set();
+  const items=[
+    agent?.model_summary,
+    agent?.summary,
+    ...(agent?.model_findings||[]),
+    ...(agent?.findings||[]).filter(item=>!/^(classify|apply|assign|confirm|maintain|validate|define|keep|break|name)\b/i.test(String(item||'')))
+  ].filter(Boolean).filter(item=>{
+    const key=String(item).toLowerCase().replace(/\s+/g,' ').trim();
+    if(seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+  return items.slice(0,3);
+}
+
+function agentValidationEvidence(agent){
+  const items=[
+    ...(agent?.model_validation_needed||[]),
+    ...(agent?.validation_needed||[])
+  ].filter(Boolean);
+  return items.slice(0,3);
+}
+
+function renderAgentReview(result){
+  const outDiv=document.getElementById('out');
+  if(!outDiv) return;
+  const rec=result?.recommendation||{};
+  const state=result?.architecture_state||{};
+  const board=result?.review_gate?.architecture_board||rec.architecture_board||{};
+  const validation=result?.review_gate?.validation||rec.validation||{};
+  const agents=(result?.agents_used||[]).join(', ')||'none';
+  const modelAgents=[];
+  const modelErrors=[];
+  const workloads=rec.retail_scope?.workload_types||state.retail_workload||[];
+  const controls=[
+    ['Security controls',(state.security_controls||[]).length],
+    ['Compliance obligations',(state.compliance_obligations||[]).length],
+    ['Governance controls',(state.governance_controls||[]).length],
+    ['Infrastructure controls',(state.infrastructure_controls||[]).length],
+    ['Technology controls',(state.technology_controls||[]).length],
+    ['Storage controls',(state.storage_controls||[]).length],
+    ['API controls',(state.api_controls||[]).length],
+    ['AI controls',(state.ai_controls||[]).length],
+    ['UI controls',(state.ui_controls||[]).length],
+    ['FinOps controls',(state.finops_controls||[]).length],
+    ['Residency rows',(state.residency_matrix||[]).length],
+    ['NFR rows',(state.nfr_coverage||[]).length]
+  ].map(([label,value])=>`<div class="cost-c"><div class="cost-tier-label">${escapeHtml(label)}</div><div class="cost-val" style="font-size:15px">${escapeHtml(value)}</div></div>`).join('');
+  const agentOutputs=result?.agent_outputs||[];
+  const specialistRows=agentOutputs.map(agent=>{
+    const findings=customerAgentRecommendation(agent).map(item=>`<div>${escapeHtml(item)}</div>`).join('');
+    const validationItems=agentValidationEvidence(agent).map(item=>`<div>${escapeHtml(item)}</div>`).join('');
+    return `<tr><td>${escapeHtml(agent.title||agent.agentId||'-')}</td><td>${findings||'-'}</td><td>${validationItems||'-'}</td></tr>`;
+  }).join('');
+  const costDrivers=(state.cost_drivers||[]).slice(0,8).map(item=>`<li>${escapeHtml(item)}</li>`).join('');
+  const pricingAssumptions=Object.entries(state.workload_pricing_assumptions||{}).map(([key,value])=>`<tr><td>${escapeHtml(key.replace(/_/g,' '))}</td><td>${escapeHtml(value||'-')}</td></tr>`).join('');
+  const residencyRows=(state.residency_matrix||[]).slice(0,10).map(item=>`<tr><td>${escapeHtml(item.component||'-')}</td><td>${escapeHtml(item.data_touched||'-')}</td><td>${escapeHtml(item.region_or_residency||'-')}</td><td>${escapeHtml(item.status||'-')}</td><td>${escapeHtml(item.action||'-')}</td></tr>`).join('');
+  const nfrRows=(state.nfr_coverage||[]).slice(0,10).map(item=>`<tr><td>${escapeHtml(item.nfr||'-')}</td><td>${escapeHtml(item.target||'-')}</td><td>${escapeHtml(item.mechanism||'-')}</td><td>${escapeHtml(item.validation_needed||'-')}</td></tr>`).join('');
+  const risks=(state.risks||[]).slice(0,10).map(item=>`<div class="risk-row"><span class="sev ${item.severity==='High'?'sev-h':item.severity==='Medium'?'sev-m':'sev-l'}">${escapeHtml(item.severity||'Risk')}</span><div><div class="risk-text">${escapeHtml(item.risk||'-')}</div><div class="risk-fix">Likelihood: ${escapeHtml(item.likelihood||'-')} | Mitigation: ${escapeHtml(item.fix||item.mitigation||'-')}</div></div></div>`).join('');
+  const isCustomerDecision=item=>{
+    const text=[item?.what,item?.why,item?.owner,item].map(value=>{
+      if(typeof value==='string') return value;
+      try{return JSON.stringify(value||'')}catch{return String(value||'')}
+    }).join(' ').toLowerCase();
+    return !/(master agent|specialist review agent|agentic|architectiq retail|technology agents complete|infrastructure and technology agents complete|current review has guardrails|run agent review)/.test(text);
+  };
+  const decisions=(state.architecture_decisions||[]).filter(isCustomerDecision).slice(0,8).map(item=>`<div class="risk-row"><span class="sev sev-l">Decision</span><div><div class="risk-text">${escapeHtml(item.what||'-')}</div><div class="risk-fix">${escapeHtml(item.why||'-')}</div></div></div>`).join('');
+  const assumptions=(state.assumptions||[]).slice(0,8).map(item=>`<li>${escapeHtml(item)}</li>`).join('');
+  const human=(rec.human_validation_needed||state.human_validation_needed||[]).slice(0,10).map(item=>`<li>${escapeHtml(item)}</li>`).join('');
+  const conflicts=(rec.conflicts||[]).map(item=>`<div class="risk-row"><span class="sev sev-m">Conflict</span><div><div class="risk-text">${escapeHtml(item.topic||'-')}</div><div class="risk-fix">${escapeHtml(item.resolution||item.impact||'-')}</div></div></div>`).join('');
+  const boardRows=(board.checks||[]).slice(0,12).map(item=>`<div class="board-row"><div><div class="board-lens">${escapeHtml(item.lens||'-')}</div><div class="board-evidence">${escapeHtml(item.evidence||item.gap||'-')}</div></div><div class="board-score ${item.score<7?'low':item.score<8?'warn':'pass'}">${escapeHtml(item.score||'-')}/10</div></div>`).join('');
+  const agentReviewResult={
+    executive_summary:rec.executive_summary||'Agent review completed.',
+    architecture_confidence:board.average>=8?'medium':'low',
+    confidence_reason:'This review is ready for customer discussion once the listed evidence, owners, assumptions, and acceptance tests are validated.',
+    evidence_status:rec.evidence_status||state.evidence_status||{pricing:'assumption',region_availability:'assumption',model_currentness:'assumption',data_residency:'assumption',compliance:'assumption'},
+    assumptions:state.assumptions||rec.assumptions||[],
+    human_validation_needed:rec.human_validation_needed||state.human_validation_needed||[],
+    workload_pricing_assumptions:state.workload_pricing_assumptions||rec.workload_pricing_assumptions||{},
+    residency_matrix:state.residency_matrix||rec.residency_matrix||[],
+    nfr_coverage:state.nfr_coverage||rec.nfr_coverage||[],
+    risks:state.risks||rec.risks||[],
+    decisions:(state.architecture_decisions||rec.architecture_decisions||[]).filter(isCustomerDecision),
+    roadmap:[
+      {phase:'Phase 1 - Validate evidence',timeline:'Now',deliverables:['Confirm assumptions','Validate data, payment, compliance, residency, pricing, and ownership evidence','Agree acceptance tests'],owner:'Client sponsor + solution architect',done_when:'Evidence status is clear and named owners accept the validation plan.'},
+      {phase:'Phase 2 - Finalise target architecture',timeline:'Next',deliverables:['Confirm runtime and technology choices','Validate NFRs and integration contracts','Agree rollout and rollback gates'],owner:'Client architecture, security, platform, and delivery owners',done_when:'Architecture choices are traceable to business outcomes, constraints, NFRs, and risk acceptance.'},
+      {phase:'Phase 3 - Approve delivery pack',timeline:'After validation',deliverables:['Client-ready architecture recommendation','Decision record','Risk register','Implementation roadmap'],owner:'Lead solution architect + client approvers',done_when:'Approvers sign off the recommendation, risks, assumptions, and delivery plan.'}
+    ],
+    next_steps:rec.next_steps||[
+      'Validate the security, compliance, governance, and FinOps findings with named human owners.',
+      'Confirm runtime, network, deployment, HA/DR, observability, UI, API, storage, and AI technology choices before final approval.',
+      'Run the listed acceptance tests and update the evidence status before client-ready sign-off.'
+    ],
+    disclaimer:'This is a customer-facing review draft. It should not be treated as final approval until evidence, owners, assumptions, risks, NFRs, residency, pricing, and rollout gates are validated.'
+  };
+  const activeAgentTier={label:'Agent review draft'};
+  const viewBar=`<div class="out-view-bar"><button class="ovp${AUDIENCE_VIEW==='technical'?' active':''}" data-mode="technical" onclick="setAudience('technical')">Technical view</button><button class="ovp${AUDIENCE_VIEW==='executive'?' active':''}" data-mode="executive" onclick="setAudience('executive')">Executive view</button></div>`;
+  const execBanner=`<div class="exec-banner exec-only"><div class="exec-banner-label">Executive summary view</div><div class="exec-banner-body">Showing a simplified, business-focused agent review. Switch to <strong>Technical view</strong> to see specialist findings, board checks, FinOps, NFRs, and validation evidence.</div></div>`;
+  const validationCard=`<div class="validation-card ${validation.verdict==='fail'?'fail':validation.verdict==='pass'?'pass':'warn'} tech-only"><div class="validation-header"><span class="validation-verdict">${escapeHtml(validation.verdict||'review')}</span><span class="validation-title">Review status</span></div><div style="font-size:11px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin:.5rem 0 .25rem">Warnings</div>${agentList(validation.warnings)}<div style="font-size:11px;font-weight:500;color:var(--color-text-tertiary);text-transform:uppercase;letter-spacing:.05em;margin:.5rem 0 .25rem">Suggested improvements</div>${agentList(validation.improvements)}</div>`;
+  const intelligenceCard='';
+  const reviewPack=buildRetailArchitectureReviewPack(S,agentReviewResult,null,null,validation);
+  const consultingPack=buildConsultingDeliveryPack(S,agentReviewResult,activeAgentTier,validation);
+  const agentScopeCards=agentOutputs.map(agent=>{
+    return `<div class="tier-card active"><span class="tier-active-badge">Review</span><div class="tier-card-label">${escapeHtml(agent.title||agent.agentId||'Review area')}</div><div class="tier-card-tagline">${escapeHtml(agent.summary||'Specialist review completed.')}</div><div class="tier-card-price">${escapeHtml((agent.findings||[]).length)} findings</div><span class="tier-budget tier-budget-ok">${escapeHtml((agent.validation_needed||[]).length)} validation items</span></div>`;
+  }).join('');
+  const agentRows=agentOutputs.map(agent=>{
+    const firstFinding=customerAgentRecommendation(agent)[0]||agent.summary||'-';
+    return `<tr><td class="layer-name">${escapeHtml(agent.title||agent.agentId||'-')}</td><td><div class="layer-why">${escapeHtml(firstFinding)}</div></td><td class="tech-only" style="white-space:nowrap;font-size:12px;color:var(--color-text-secondary)">${escapeHtml((agent.risks||[]).length)} risks</td></tr>`;
+  }).join('');
+  const graphTrace='';
+  const roadmap=(agentReviewResult.roadmap||[]).map((item,index)=>{const bullets=(item.deliverables||[]).map(d=>`<li>${escapeHtml(d)}</li>`).join('');return `<div class="rm-phase"><div class="rm-rail"><div class="rm-node">${index+1}</div><div class="rm-line"></div></div><div class="rm-body"><div class="rm-head"><div class="rm-title">${escapeHtml(item.phase||'-')}</div><span class="rm-badge">${escapeHtml(item.timeline||'-')}</span></div><ul class="rm-deliverables tech-only">${bullets}</ul><div class="rm-footer tech-only"><div class="rm-meta-row"><span class="rm-meta-label rm-owner-label">Owner</span><span class="rm-meta-val">${escapeHtml(item.owner||'-')}</span></div><div class="rm-meta-row"><span class="rm-meta-label rm-done-label">Done when</span><span class="rm-meta-val">${escapeHtml(item.done_when||'-')}</span></div></div></div></div>`;}).join('');
+  const nextSteps=(agentReviewResult.next_steps||[]).map((item,index)=>`<div class="step-item"><div class="step-n">${index+1}</div><div class="step-text">${escapeHtml(item)}</div></div>`).join('');
+  const reviewerWorkflow='';
+  const agentGate=`<div class="client-ready-gate card tech-only fail"><div class="card-head"><div class="card-head-dot"></div>Client-ready approval gate</div><div class="gate-summary"><div><div class="review-label">Approval status</div><strong>Human validation required</strong><p>The review can be discussed with the client, but final approval requires evidence for assumptions, data classification, PCI/privacy scope, residency, budget, rollout gates, NFRs, and system ownership.</p></div><div class="gate-score fail">DRAFT</div></div><div class="review-section-title">Evidence required</div><ul class="review-gates"><li>Validate data classification, PCI/privacy scope, residency, budget, rollout gates, and system ownership.</li><li>Confirm runtime, technology, integration, observability, HA/DR, and support-model choices.</li><li>Run acceptance tests for peak load, replay/idempotency, rollback, payment boundary, privacy deletion, and AI safety.</li></ul></div>`;
+  outDiv.innerHTML=[
+    viewBar,
+    execBanner,
+    validationCard,
+    `<div class="architecture-board card tech-only"><div class="card-head"><div class="card-head-dot"></div>Architecture review board</div><div class="board-summary"><div><div class="review-label">Board posture</div><strong>${escapeHtml(board.status||'Review')}</strong><p>${escapeHtml(board.workload_profile?.primary||'Retail architecture review')} across security, compliance, governance, and FinOps.</p></div><div class="board-score-big ${board.average<7?'low':board.average<8?'warn':'pass'}">${escapeHtml(board.average||'-')}<span>/10</span></div></div><div class="board-grid">${boardRows||'<div class="validation-item">No board checks returned.</div>'}</div></div>`,
+    agentGate,
+    reviewPack,
+    consultingPack,
+    `<div class="out-summary">${escapeHtml(rec.executive_summary||'Architecture review completed.')}</div>`,
+    `<div class="tier-selector">${agentScopeCards||'<div class="tier-card active"><div class="tier-card-label">No review areas returned</div></div>'}</div>`,
+    `<div class="card"><div class="card-head"><div class="card-head-dot"></div>Specialist review summary</div><table class="stack-table"><thead><tr><th style="width:160px">Review area</th><th>Customer-facing recommendation</th><th class="tech-only" style="width:100px">Risks</th></tr></thead><tbody>${agentRows||'<tr><td colspan="3">No specialist output returned.</td></tr>'}</tbody></table></div>`,
+    `<div class="card tech-only"><div class="card-head"><div class="card-head-dot"></div>Recommendations by review area</div><div class="review-table-wrap"><table class="review-table"><thead><tr><th>Review area</th><th>Recommendation</th><th>Evidence to validate</th></tr></thead><tbody>${specialistRows||'<tr><td colspan="3">No specialist output returned.</td></tr>'}</tbody></table></div></div>`,
+    `<div class="card tech-only"><div class="card-head"><div class="card-head-dot"></div>FinOps cost model</div><div class="consulting-columns"><div><div class="review-section-title">Cost drivers</div><ul class="review-gates">${costDrivers||'<li>No FinOps cost drivers returned.</li>'}</ul></div><div><div class="review-section-title">Pricing assumptions</div><div class="review-table-wrap"><table class="review-table"><thead><tr><th>Assumption</th><th>Value</th></tr></thead><tbody>${pricingAssumptions||'<tr><td colspan="2">No workload pricing assumptions returned.</td></tr>'}</tbody></table></div></div></div></div>`,
+    `<div class="card"><div class="card-head"><div class="card-head-dot"></div>Risk register</div>${risks||'<div class="validation-item">No risks returned.</div>'}</div>`,
+    `<div class="card tech-only"><div class="card-head"><div class="card-head-dot"></div>Decision rationale</div>${decisions||'<div class="validation-item">No decisions returned.</div>'}</div>`,
+    conflicts?`<div class="card tech-only"><div class="card-head"><div class="card-head-dot"></div>Conflicts and validation gaps</div>${conflicts}</div>`:'',
+    `<div class="card"><div class="card-head"><div class="card-head-dot"></div>Validation roadmap</div><div class="roadmap-timeline">${roadmap}</div></div>`,
+    `<div class="card"><div class="card-head"><div class="card-head-dot"></div>Immediate next steps</div>${nextSteps}</div>`,
+    `<div class="card"><div class="card-head"><div class="card-head-dot"></div>Disclaimer</div><div class="risk-fix">${escapeHtml(agentReviewResult.disclaimer)}</div></div>`,
+    `<div style="display:flex;justify-content:space-between;align-items:center;margin-top:1.5rem;gap:1rem;flex-wrap:wrap"><button class="btn" onclick="newEngagement()">New engagement</button><div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn" onclick="printReviewDraft()">Print review draft</button><button class="btn pri" disabled>Client-ready export</button></div></div>`
+  ].join('');
+  setAudience(AUDIENCE_VIEW);
+}
+
+async function runAgentReview(){
+  const outDiv=document.getElementById('out');
+  if(!outDiv) return;
+  outDiv.innerHTML='<div class="card"><div class="card-head"><div class="card-head-dot"></div>Agent review running</div><div class="risk-fix">Security, compliance, governance, infrastructure, technology, storage, API, AI, UI, FinOps, and synthesis agents are reviewing the current form inputs.</div></div>';
+  try{
+    const payload={
+      mode:'retail-agent-review',
+      useModel:true,
+      state:S,
+      query:`Review this retail architecture request for ${S.basics.company||'the client'}: ${S.basics.problem||''} ${S.basics.constraints||''}`
+    };
+    const res=await fetch('/api/agents/architect',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+    const data=await res.json();
+    if(!res.ok) throw new Error(data?.error?.message||`Agent review failed with HTTP ${res.status}`);
+    logEvent('info','agents.review_completed',{agents:data.agents_used,board:data.review_gate?.architecture_board?.average,hasSynthesis:Boolean(data.architecture_recommendation?.tiers?.length)});
+    const synthesized=data.architecture_recommendation||data.synthesis_recommendation;
+    if(Array.isArray(synthesized?.tiers)&&synthesized.tiers.length){
+      LAST_VALIDATION=data.review_gate?.validation||null;
+      showOutput(synthesized,[],null,LAST_VALIDATION);
+    }else{
+      renderAgentReview(data);
+    }
+  }catch(err){
+    logEvent('error','agents.review_failed',{message:err.message});
+    outDiv.innerHTML=`<div class="err-box" style="margin-top:1rem"><strong>Agent review failed.</strong> ${escapeHtml(err.message)}</div>`;
+  }
 }
 
 export function sp(key,value){
@@ -4870,7 +5041,7 @@ export function showOutput(result,contradictions=[],research=null,validation=nul
 
   const viewBar=`<div class="out-view-bar"><button class="ovp${AUDIENCE_VIEW==='technical'?' active':''}" data-mode="technical" onclick="setAudience('technical')">Technical view</button><button class="ovp${AUDIENCE_VIEW==='executive'?' active':''}" data-mode="executive" onclick="setAudience('executive')">Executive view</button></div>`;
   const execBanner=`<div class="exec-banner exec-only"><div class="exec-banner-label">Executive summary view</div><div class="exec-banner-body">Showing a simplified, business-focused summary. Switch to <strong>Technical view</strong> to see full stack details, architecture diagrams, and implementation specifics.</div></div>`;
-  const intelligenceCard=buildArchitectureIntelligenceCard(S,validation);
+  const intelligenceCard='';
   const boardCard=buildArchitectureBoardCard(S,result,validation);
   const reviewPack=buildRetailArchitectureReviewPack(S,result,research,LAST_PRICING_CONTEXT,validation);
   const consultingPack=buildConsultingDeliveryPack(S,result,activeTier,validation);
@@ -4924,6 +5095,7 @@ export function getReviewDecision(){return REVIEW_DECISION}
 if(typeof window!=='undefined'){
   Object.assign(window,{
     setStep, go, handleTopAction, sp, generate, runMockRecommendation,
+    runAgentReview,
     setTier, setAudience, newEngagement, toggleLogs, setLogScope,
     clearClientLogs, clearServerLogs, refreshServerLogs, loadScenario,
     setArchitecturePanel, setArchitectureDisplay, copyArchitectureCode,

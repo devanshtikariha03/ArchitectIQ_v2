@@ -5,6 +5,7 @@ const { spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const url = require('url');
+const { runArchitectAgents } = require('./agents/masterAgent');
 
 const PORT = Number(process.env.PORT) || 3000;
 const OPENAI_API_KEY = process.env.OPENAI_API_KEY || '';
@@ -12,6 +13,8 @@ const ANTHROPIC_API_KEY = process.env.ANTHROPIC_API_KEY || '';
 const ANTHROPIC_MODEL = process.env.ANTHROPIC_MODEL || 'claude-3-5-sonnet-20240620';
 const ANTHROPIC_API_VERSION = process.env.ANTHROPIC_API_VERSION || '2023-06-01';
 const LLM_PRIMARY = (process.env.LLM_PRIMARY || '').toLowerCase();
+const GCP_BILLING_TOKEN = process.env.GCP_BILLING_BEARER_TOKEN || process.env.GOOGLE_CLOUD_BILLING_TOKEN || '';
+const GCP_API_KEY = process.env.GOOGLE_CLOUD_API_KEY || process.env.GCP_API_KEY || process.env.GOOGLE_API_KEY || '';
 const HTML_FILE = path.join(__dirname, 'ArchitectIQ.html');
 const LANDING_DIR = path.join(__dirname, 'landing', 'dist');
 const IS_DEV = process.env.NODE_ENV !== 'production';
@@ -446,6 +449,76 @@ const server = http.createServer((req, res) => {
     }));
   }
 
+  if (req.method === 'POST' && parsed.pathname === '/api/agents/architect') {
+    const MAX_BODY_BYTES = 1 * 1024 * 1024;
+    let body = '';
+    let bodyBytes = 0;
+    let tooLarge = false;
+
+    req.on('data', chunk => {
+      if (tooLarge) return;
+      bodyBytes += chunk.length;
+      if (bodyBytes > MAX_BODY_BYTES) {
+        tooLarge = true;
+        res.writeHead(413, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: { message: 'Request body exceeds 1 MB limit.' } }));
+        req.destroy();
+        return;
+      }
+      body += chunk;
+    });
+
+    req.on('end', async () => {
+      if (tooLarge) return;
+      const requestId = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 8)}`;
+
+      let parsedBody;
+      try {
+        parsedBody = JSON.parse(body || '{}');
+      } catch (err) {
+        writeServerLog('error', 'agents.request_invalid_json', {
+          requestId,
+          message: err.message
+        });
+        res.writeHead(400, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: { message: 'Invalid JSON payload.' } }));
+      }
+
+      writeServerLog('info', 'agents.request_started', {
+        requestId,
+        mode: parsedBody?.mode || 'architecture-review',
+        agents: parsedBody?.agents || parsedBody?.requestedAgents || ['security', 'compliance', 'governance', 'infrastructure', 'technology', 'storage', 'api', 'ai', 'ui', 'finops']
+      });
+
+      try {
+        const result = await runArchitectAgents(parsedBody);
+        if (result.development_diagnostics) {
+          writeServerLog('info', 'agents.development_diagnostics', {
+            requestId,
+            diagnostics: result.development_diagnostics
+          });
+          delete result.development_diagnostics;
+        }
+        writeServerLog('info', 'agents.response_finished', {
+          requestId,
+          agents_used: result.agents_used,
+          risks: result.architecture_state?.risks?.length || 0,
+          validation_gaps: result.architecture_state?.validation_gaps?.length || 0
+        });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify(result));
+      } catch (err) {
+        writeServerLog('error', 'agents.response_failed', {
+          requestId,
+          message: err.message
+        });
+        res.writeHead(500, { 'Content-Type': 'application/json' });
+        return res.end(JSON.stringify({ error: { message: err.message } }));
+      }
+    });
+    return;
+  }
+
   if (req.method === 'POST' && parsed.pathname === '/api/diagram/render') {
     let body = '';
     req.on('data', chunk => body += chunk);
@@ -616,13 +689,27 @@ const server = http.createServer((req, res) => {
 
   // Pricing proxy — GCP Cloud Billing Catalog (requires OAuth; returns 401 without credentials)
   if (req.method === 'GET' && parsed.pathname === '/api/pricing/gcp') {
+    // Supports API-key public list pricing as well as OAuth billing access.
     const serviceId = (parsed.query.serviceId || '').replace(/[^A-Za-z0-9-]/g, '');
-    const gcpPath = serviceId ? `/v1/services/${serviceId}/skus` : '/v1/services';
+    let gcpPath = serviceId ? `/v1/services/${serviceId}/skus` : '/v1/services';
+    const headers = { 'Accept': 'application/json' };
+    if (GCP_BILLING_TOKEN) {
+      headers.Authorization = `Bearer ${GCP_BILLING_TOKEN}`;
+    } else if (GCP_API_KEY) {
+      gcpPath += `${gcpPath.includes('?') ? '&' : '?'}key=${encodeURIComponent(GCP_API_KEY)}`;
+    } else {
+      res.writeHead(501, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({
+        error: 'GCP Cloud Billing pricing requires an API key or OAuth 2.0 credentials.',
+        note: 'Set GOOGLE_CLOUD_API_KEY/GCP_API_KEY for public list pricing, or GOOGLE_CLOUD_BILLING_TOKEN/GCP_BILLING_BEARER_TOKEN for authenticated billing access.'
+      }));
+      return;
+    }
     const options = {
       hostname: 'cloudbilling.googleapis.com',
       path: gcpPath,
       method: 'GET',
-      headers: { 'Accept': 'application/json' }
+      headers
     };
     const proxyReq = https.request(options, proxyRes => {
       let data = '';
@@ -636,7 +723,7 @@ const server = http.createServer((req, res) => {
       res.writeHead(502, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({
         error: err.message,
-        note: 'GCP Cloud Billing API requires OAuth 2.0 credentials. Set up a service account and pass a Bearer token to use this endpoint.'
+        note: 'Set GOOGLE_CLOUD_API_KEY/GCP_API_KEY for public list pricing, or GOOGLE_CLOUD_BILLING_TOKEN/GCP_BILLING_BEARER_TOKEN for authenticated billing access.'
       }));
     });
     proxyReq.end();

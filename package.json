@@ -7,6 +7,17 @@
     "start": "node server.js",
     "render-build": "npm install && python3 -m venv .venv && ./.venv/bin/python -m pip install --upgrade pip && ./.venv/bin/python -m pip install -r requirements.txt && npm --prefix landing install && npm --prefix landing run build",
     "test": "node test-harness/stress.js",
+    "test:security-agent": "node test-harness/security-agent-eval.js",
+    "test:compliance-agent": "node test-harness/compliance-agent-eval.js",
+    "test:governance-agent": "node test-harness/governance-agent-eval.js",
+    "test:infrastructure-agent": "node test-harness/infrastructure-agent-eval.js",
+    "test:technology-agent": "node test-harness/technology-agent-eval.js",
+    "test:storage-agent": "node test-harness/storage-agent-eval.js",
+    "test:api-agent": "node test-harness/api-agent-eval.js",
+    "test:ai-agent": "node test-harness/ai-agent-eval.js",
+    "test:ui-agent": "node test-harness/ui-agent-eval.js",
+    "test:synthesis-agent": "node test-harness/synthesis-agent-eval.js",
+    "test:finops-agent": "node test-harness/finops-agent-eval.js",
     "test:llm": "node test-harness/stress-llm.js",
     "test:all": "node test-harness/stress.js && node test-harness/stress-llm.js",
     "test:report": "node test-harness/report.js --open"
@@ -15,6 +26,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@langchain/core": "^1.2.2",
+    "@langchain/langgraph": "^1.4.7",
     "dotenv": "^17.3.1",
     "mermaid": "^11.13.0"
   }
